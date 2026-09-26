@@ -28,7 +28,7 @@ async function refreshPrices(){
     priceChecks.set(ticker,{checkedAt:result?.checkedAt,error:!valid||!!result.error||!!result.stale});
    }
   }catch{for(const ticker of batch)priceChecks.set(ticker,{error:true})}
-  renderRows();liveStatusView();
+  renderRows();renderPeople();liveStatusView();
  }
  priceBusy=false;liveStatusView();if(typeof renderTerminal==='function'){await loadMarketPrices([...workspaceState.symbols,...workspaceState.rules.map(r=>r.symbol),marketSymbol,'SPY']);renderTerminal();await workspaceAction()}
 }

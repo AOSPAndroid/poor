@@ -1,7 +1,7 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert');
 const elements=new Map();const el=s=>{if(!elements.has(s))elements.set(s,{value:'',innerHTML:'',textContent:'',hidden:false,classList:{toggle(){},add(){},remove(){}},addEventListener(){},showModal(){},close(){}});return elements.get(s)};
 const context={console,Date,URL,Blob,Set,Map,JSON,crypto:require('crypto').webcrypto,setTimeout,clearTimeout,localStorage:{getItem(){return null},setItem(){}},document:{querySelector:el,querySelectorAll(){return []},addEventListener(){}}};vm.createContext(context);
-vm.runInContext(fs.readFileSync('dist/data.js','utf8')+'\n'+fs.readFileSync('dist/prices.js','utf8')+'\n'+fs.readFileSync('dist/returns.js','utf8')+'\n'+fs.readFileSync('dist/clusters.js','utf8')+'\n'+fs.readFileSync('dist/app.js','utf8'),context);
+vm.runInContext(fs.readFileSync('dist/data.js','utf8')+'\n'+fs.readFileSync('dist/prices.js','utf8')+'\n'+fs.readFileSync('dist/returns.js','utf8')+'\n'+fs.readFileSync('dist/clusters.js','utf8')+'\n'+fs.readFileSync('dist/track-record.js','utf8')+'\n'+fs.readFileSync('dist/app.js','utf8'),context);
 const run=s=>vm.runInContext(s,context);
 assert.equal(run('data.length'),47);assert.equal(run('new Set(data.map(r=>r.id)).size'),47);
 run('data.forEach(validate)');
@@ -75,3 +75,12 @@ assert.equal(run("disclosureReturn({...SEED[0],ticker:'TEST',traded:'2026-07-01'
 assert.equal(run("disclosureReturn({...SEED[0],ticker:'TEST',traded:'2026-07-01',filed:'2026-07-16'})"),null);
 run("details(SEED.find(r=>r.person==='Donald Trump').id)");assert.ok(el('#detailContent').innerHTML.includes('Report signed'));assert.ok(el('#detailContent').innerHTML.includes('Sep 22, 2026'));
 console.log('Passed: labeled dates, publication vs signature, disclosure gaps, company names and disclosure-day price calculations.');
+const trackFixture=[{person:'A',ticker:'T',type:'Purchase',asset:'Stock',traded:'2026-09-01',filed:'2026-09-02',chamber:'House',source:'https://example.com'}, {person:'A',ticker:'LOSS',type:'Purchase',asset:'ETF',traded:'2026-09-01',filed:'2026-09-02',chamber:'House',source:'https://example.com'}];
+const trackPrices={T:{latest:120,asOf:'2026-09-25',closes:{'2026-09-01':100,'2026-09-02':110}},LOSS:{latest:80,asOf:'2026-09-25',closes:{'2026-09-01':100,'2026-09-02':100}}};
+context.trackFixture=trackFixture;context.trackPrices=trackPrices;
+const tr=run("trackRecord('A',{basis:'trade',period:'all'},[...trackFixture,trackFixture[0],{...trackFixture[0],asset:'Call options'},{...trackFixture[0],ticker:'MISSING'}],trackPrices,Date.parse('2026-09-26'))");
+assert.equal(tr.count,2);assert.equal(tr.total,3);assert.ok(Math.abs(tr.avg)<1e-8);assert.equal(tr.win,50);
+const dr=run("trackRecord('A',{basis:'disclosed',period:'all'},trackFixture,trackPrices,Date.parse('2026-09-26'))");assert.ok(Math.abs(dr.avg-((120/110-1)*100-20)/2)<1e-8);
+assert.equal(run("trackRecord('A',{basis:'trade',period:'90'},trackFixture,trackPrices,Date.parse('2027-09-26')).count"),0);
+run("trackSettings.min=0;trackSettings.gain=0;renderPeople()");assert.ok(run("rankPeople([...new Set(data.map(r=>r.person))]).every(p=>trackRecord(p).avg>=0)"));
+console.log('Passed: track-record dedupe, missing coverage, option exclusions, equal weighting, return bases, win rate, time window and gain filtering.');
