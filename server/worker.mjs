@@ -69,19 +69,20 @@ async function fetchText(url,maxBytes=3000000){
 async function fetchJSON(url,maxBytes){return JSON.parse((await fetchText(url,maxBytes)).text)}
 export function chartPrices(raw,symbol,now=Date.now()){
  const r=raw.chart?.result?.[0];if(!r||r.meta?.symbol!==symbol||!r.meta.currency||!Array.isArray(r.timestamp))throw Error('Price source unavailable');
- const closes={};const end=r.meta.currentTradingPeriod?.regular?.end*1000;
+ const closes={},bars={};const end=r.meta.currentTradingPeriod?.regular?.end*1000;
  const today=new Date(now).toISOString().slice(0,10);
  r.timestamp.forEach((ts,i)=>{const value=r.indicators?.quote?.[0]?.close?.[i],day=new Date(ts*1000).toISOString().slice(0,10);if(Number.isFinite(value)&&value>0&&ts*1000<=now&&!(day===today&&end>now))closes[day]=value});
+ r.timestamp.forEach((ts,i)=>{const day=new Date(ts*1000).toISOString().slice(0,10),q=r.indicators?.quote?.[0];if(!closes[day]||!q)return;const high=q.high?.[i],low=q.low?.[i],volume=q.volume?.[i];if(Number.isFinite(high)&&Number.isFinite(low)&&high>=low&&low>0&&high>=closes[day]&&low<=closes[day])bars[day]={high,low,close:closes[day],volume:Number.isFinite(volume)&&volume>=0?volume:null}});
  const asOf=Object.keys(closes).sort().at(-1);if(!asOf)throw Error('No completed daily closes');
  const dates=Object.keys(closes).sort(),index=r.timestamp.findIndex(ts=>new Date(ts*1000).toISOString().slice(0,10)===asOf),quote=r.indicators.quote[0],previousClose=closes[dates.at(-2)]||null;
- return {currency:r.meta.currency,asOf,latest:closes[asOf],closes,previousClose,name:r.meta.longName||r.meta.shortName||symbol,exchange:r.meta.fullExchangeName||r.meta.exchangeName||'',instrument:r.meta.instrumentType||'',open:quote.open?.[index]??null,high:quote.high?.[index]??null,low:quote.low?.[index]??null,volume:quote.volume?.[index]??null,high52:r.meta.fiftyTwoWeekHigh??null,low52:r.meta.fiftyTwoWeekLow??null,source:`https://finance.yahoo.com/quote/${encodeURIComponent(symbol)}/history/`};
+ return {currency:r.meta.currency,asOf,latest:closes[asOf],closes,bars,previousClose,name:r.meta.longName||r.meta.shortName||symbol,exchange:r.meta.fullExchangeName||r.meta.exchangeName||'',instrument:r.meta.instrumentType||'',open:quote.open?.[index]??null,high:quote.high?.[index]??null,low:quote.low?.[index]??null,volume:quote.volume?.[index]??null,high52:r.meta.fiftyTwoWeekHigh??null,low52:r.meta.fiftyTwoWeekLow??null,source:`https://finance.yahoo.com/quote/${encodeURIComponent(symbol)}/history/`};
 }
 const xmlText=s=>s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,'$1').replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Math.min(Number(n),1114111))).replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&');
 export function newsRows(xml){
  const items=[...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0,6).map(([,item])=>{const get=tag=>xmlText(item.match(new RegExp('<'+tag+'(?: [^>]*)?>([\\s\\S]*?)<\\/'+tag+'>'))?.[1]||'').trim();return {title:get('title').slice(0,220),url:get('link'),published:get('pubDate')}});
  return items.filter(i=>i.title&&i.url.startsWith('https://')&&!isNaN(Date.parse(i.published)));
 }
-async function pricesFor(env,symbol){return cached(env,'prices-v2/'+symbol,15*60000,async()=>chartPrices(await fetchJSON(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=2y&interval=1d`),symbol))}
+async function pricesFor(env,symbol){return cached(env,'prices-v3/'+symbol,15*60000,async()=>chartPrices(await fetchJSON(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=2y&interval=1d`),symbol))}
 const DEFAULT_WATCH=['BE','INTC','NVDA','SPY'];
 export function validateWorkspaceAction(action){
  if(!action||!['watch','rule','deleteRule','readAlerts'].includes(action.kind))throw Error('Unknown action');
@@ -134,7 +135,7 @@ async function workspace(request,env){
    const feeds=await Promise.all(['congress-roster-v1'].map(async k=>{const o=await env.BUCKET.get('pif/v1/'+k);return o?await o.json():null}));
    const records=feeds.flatMap(f=>f?.value?.rows||[]).filter(r=>rosterMembers.has(r.person));const symbols=[...new Set(state.rules.filter(r=>r.type.startsWith('price')).map(r=>r.symbol))];const prices={};
    // Use cached quotes; browser's normal update loop obtains new quotes before checking alerts.
-   for(const s of symbols){const o=await env.BUCKET.get('pif/v1/prices-v2/'+s);if(o)prices[s]=await o.json()}
+   for(const s of symbols){const o=await env.BUCKET.get('pif/v1/prices-v3/'+s);if(o)prices[s]=await o.json()}
    if(feeds.every(f=>f?.value&&!f.stale&&!f.error&&Date.now()-f.checkedAt<6*HOUR))evaluateRules(state,records,prices);else{const rules=state.rules.filter(r=>r.type.startsWith('price')),evaluated=evaluateRules({...state,rules},[],prices);state.alerts=evaluated.alerts;state.evaluatedAt=evaluated.evaluatedAt}
   }
   const saved=await env.BUCKET.put(key,JSON.stringify(state),{onlyIf:object?{etagMatches:object.etag}:{etagDoesNotMatch:'*'}});
