@@ -8,3 +8,15 @@ dialog{border:1px solid var(--line);border-radius:8px;padding:24px;max-width:520
 .person-card .mini-stat{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12px}.performance{font-weight:650}.person-card{padding:11px}.person-card p{font-size:12px}.person-card button{font-size:13px}
 
 .cluster-strip{display:flex;align-items:center;flex-wrap:wrap;gap:6px 12px;padding:4px 0 7px;font-size:12px;color:var(--muted)}.cluster-strip label{display:flex;align-items:center;gap:6px}.cluster-strip select{padding:2px 5px;font-size:12px}.cluster-flag{font-size:12px;font-weight:650;padding:2px 5px;margin-left:5px;border-radius:3px;background:#fff0c7;color:#6e4c00;white-space:nowrap}.cluster-evidence article{padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}.cluster-evidence small{font-size:12px;color:var(--muted)}#clusterChips{display:flex;flex-wrap:wrap;gap:3px}@media(max-width:600px){.tabs{width:100%;justify-content:space-between}.cluster-strip{gap:4px 8px}.cluster-flag{margin-left:0}}
+
+/* Purchase performance is the primary reading order. */
+.who small,.what small,.filed small,.return-cell small{display:block;margin-left:0;font-size:12px}.price-then,.price-now,.return-cell{font-variant-numeric:tabular-nums}.gain{color:#15633d}.loss{color:#a5362c}.return-cell small{font-weight:400;color:var(--muted)}.return-detail{padding:12px;background:#f2f5f2;margin:12px 0}.return-detail p{font-size:14px;margin:6px 0}.price-note{color:#435f67}.who,.what{white-space:normal}td{height:42px}
+@media(max-width:600px){
+tr{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:5px 8px;padding:7px 8px}
+tr td{grid-column:auto!important;grid-row:auto!important;justify-self:stretch!important;height:auto;font-size:13px!important}
+tr .who{grid-column:1/3!important;grid-row:1!important}tr .open-detail{grid-column:3!important;grid-row:1!important;justify-self:end!important}
+tr .what{grid-column:1!important;grid-row:2!important}tr .when{grid-column:2!important;grid-row:2!important}tr .return-cell{grid-column:3!important;grid-row:2!important;text-align:right}
+tr .amount{grid-column:1/3!important;grid-row:3!important}tr .price-then{grid-column:1!important;grid-row:4!important}tr .price-now{grid-column:2/4!important;grid-row:4!important;text-align:right}
+tr .filed{grid-column:1/4!important;grid-row:5!important;font-size:12px!important}tr .filed small{display:inline;margin-left:6px}
+tr td::before{content:none!important}tr .price-then::before{content:'Then '!important;color:var(--muted)}tr .price-now::before{content:'Latest '!important;color:var(--muted)}tr .filed::before{content:'Filed '!important;color:var(--muted)}
+}
