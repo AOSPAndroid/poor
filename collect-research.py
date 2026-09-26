@@ -26,7 +26,7 @@ def cited_urls(session,initial):
     return urls
 def request(base,path,body=None,token=None):
     headers={'Accept':'application/json','User-Agent':'poor scheduled research collector'}
-    if body is not None: headers.update({'Content-Type':'application/json','Authorization':'Bearer '+token})
+    if body is not None: headers.update({'Content-Type':'application/json','Authorization':'Bearer '+token,'Origin':base})
     req=urllib.request.Request(base+path,data=json.dumps(body).encode() if body is not None else None,headers=headers)
     with urllib.request.urlopen(req,timeout=150) as r:return json.load(r)
 def run(research=False,local=False):
@@ -34,6 +34,11 @@ def run(research=False,local=False):
     base='http://127.0.0.1:4185' if local else config.get('base','https://poor.daaalil.chatgpt.site')
     old=json.loads(STATE.read_text()) if STATE.exists() else {'researched':[]}
     good=bad=0; candidates=[];failures=[]
+    def progress(stage):
+        if not local:
+            old.update({'stage':stage,'successful':good,'failed':bad,'updatedAt':time.time()})
+            STATE.write_text(json.dumps(old,indent=2))
+    progress('Starting collection')
     def get(path):
         nonlocal good,bad
         try:
@@ -44,6 +49,7 @@ def run(research=False,local=False):
             bad+=1;failures.append(path);return {}
     get('/api/feed/congress');get('/api/research/treasury');get('/api/prices?symbols=SPY,QQQ,TLT,HYG,LQD,UUP')
     for symbol in UNIVERSE:
+        progress('Collecting '+symbol)
         get('/api/prices?symbols='+symbol)
         for source in ['sec','awards','policy','bills','earnings']:
             get('/api/research?symbol='+symbol+'&source='+source)
@@ -54,6 +60,7 @@ def run(research=False,local=False):
         request(base,'/api/research/ingest',{'kind':'collector','successful':good,'failed':bad},config['token'])
     # At most one investigation per run. Plain research only: no trades, messages or account changes.
     if research and candidates and not local:
+        progress('Investigating strongest new overlap')
         selected=sorted(candidates,key=lambda s:len(s['politicians'])+s['insiderOwners'],reverse=True)[0]
         symbol=selected['symbol']; prompt=(
           'Research this public buying overlap for the poor app. Use your available X search and web research tools. '
@@ -83,7 +90,7 @@ def run(research=False,local=False):
             old['agentStatus']='Published '+str(len(report['items']))+' sourced leads for '+symbol
         except Exception:
             old['agentStatus']='Research failed; no report published; will retry next run'
-    old.update({'lastRun':time.time(),'successful':good,'failed':bad,'failures':failures})
+    old.update({'lastRun':time.time(),'successful':good,'failed':bad,'failures':failures,'stage':'Complete'})
     if not local:STATE.write_text(json.dumps(old,indent=2))
     print(json.dumps({'successful':good,'failed':bad,'agentStatus':old.get('agentStatus','No new overlap to investigate'),'failures':failures}))
 if __name__=='__main__':
