@@ -30,7 +30,7 @@ async function refreshPrices(){
   }catch{for(const ticker of batch)priceChecks.set(ticker,{error:true})}
   renderRows();liveStatusView();
  }
- priceBusy=false;liveStatusView();
+ priceBusy=false;liveStatusView();if(typeof renderTerminal==='function'){await loadMarketPrices([...workspaceState.symbols,...workspaceState.rules.map(r=>r.symbol),marketSymbol,'SPY']);renderTerminal();await workspaceAction()}
 }
 async function refreshLive(){
  if(liveBusy)return;liveBusy=true;liveStatusView();
@@ -44,7 +44,7 @@ async function refreshLive(){
    liveStatus[name]={...result,providerStale:!!value&&(value.providerCurrent===false||!value.sourceUpdatedAt||Date.now()-Date.parse(value.sourceUpdatedAt)>48*3600000)};
   }catch{liveStatus[name]={...liveStatus[name],error:true,stale:true}}
  }));
- rebuildLiveData();liveBusy=false;liveStatusView();await refreshPrices();
+ rebuildLiveData();if(typeof renderTerminal==='function')renderTerminal();liveBusy=false;liveStatusView();await refreshPrices();
 }
 if(typeof window!=='undefined'&&typeof fetch==='function'){
  refreshLive();

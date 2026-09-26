@@ -1,0 +1,28 @@
+import assert from 'node:assert/strict';
+import worker,{evaluateRules,validateWorkspaceAction,newsRows} from './server/worker.mjs';
+const now=Date.now(),day=new Date(now).toISOString().slice(0,10);
+const state={rules:[{id:'p',symbol:'BE',type:'priceAbove',threshold:100}],alerts:[]};
+const quote=n=>({BE:{checkedAt:now,value:{latest:n,asOf:day,currency:'USD'}}});
+evaluateRules(state,[],quote(110),now);assert.equal(state.alerts.length,1);
+evaluateRules(state,[],quote(110),now);assert.equal(state.alerts.length,1);
+evaluateRules(state,[],quote(90),now);assert.equal(state.rules[0].hit,false);
+const filings={rules:[{id:'f',symbol:'BE',type:'filings'}],alerts:[]};
+const row={id:'one',ticker:'BE',person:'Person A',type:'Purchase',asset:'Stock',traded:day,filed:day};
+evaluateRules(filings,[row],{},now);assert.equal(filings.alerts.length,0);
+evaluateRules(filings,[row,{...row,id:'two'}],{},now);assert.equal(filings.alerts.length,1);
+const cluster={rules:[{id:'c',symbol:'BE',type:'cluster'}],alerts:[]};
+evaluateRules(cluster,[row,{...row,id:'two'}],{},now);assert.equal(cluster.alerts.length,0);
+evaluateRules(cluster,[row,{...row,id:'three',person:'Person B'}],{},now);assert.equal(cluster.alerts.length,1);
+assert.throws(()=>validateWorkspaceAction({kind:'rule',symbol:'BE',type:'priceAbove',threshold:-1}));
+assert.equal(newsRows('<item><title>Bad</title><link>javascript:x</link><pubDate>Sat, 26 Sep 2026 12:00:00 GMT</pubDate></item>').length,0);
+class Bucket{constructor(){this.data=new Map();this.n=0}async get(k){const v=this.data.get(k);return v?{etag:v.etag,json:async()=>JSON.parse(v.text)}:null}async put(k,text,o={}){const v=this.data.get(k);if(o.onlyIf?.etagMatches&&v?.etag!==o.onlyIf.etagMatches||o.onlyIf?.etagDoesNotMatch==='*'&&v)return null;const etag=String(++this.n);this.data.set(k,{text,etag});return {etag}}}
+const env={BUCKET:new Bucket()},url='https://pif.test/api/workspace';
+const first=await worker.fetch(new Request(url),env);assert.equal(first.status,200);const cookie=first.headers.get('set-cookie').split(';')[0];assert.match(first.headers.get('set-cookie'),/Secure; HttpOnly; SameSite=Lax/);
+const post=body=>worker.fetch(new Request(url,{method:'POST',headers:{cookie,origin:'https://pif.test','content-type':'application/json'},body:JSON.stringify(body)}),env);
+assert.equal((await post({kind:'watch',symbol:'AAPL',enabled:true})).status,200);
+const saved=await (await worker.fetch(new Request(url,{headers:{cookie}}),env)).json();assert.ok(saved.symbols.includes('AAPL'));
+const stranger=await (await worker.fetch(new Request(url),env)).json();assert.ok(!stranger.symbols.includes('AAPL'));
+assert.equal((await worker.fetch(new Request(url,{method:'POST',headers:{origin:'https://bad.test','content-type':'application/json'},body:'{}'}),env)).status,403);
+const rule=await (await post({kind:'rule',symbol:'BE',type:'filings'})).json();assert.equal(rule.rules.length,1);
+const removed=await (await post({kind:'deleteRule',id:rule.rules[0].id})).json();assert.equal(removed.rules.length,0);
+console.log('Passed: durable workspace, cookie isolation, CSRF, rule validation/removal, price dedupe, filing baseline, distinct-buyer cluster, safe news URLs.');

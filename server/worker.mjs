@@ -66,7 +66,70 @@ export function chartPrices(raw,symbol,now=Date.now()){
  const today=new Date(now).toISOString().slice(0,10);
  r.timestamp.forEach((ts,i)=>{const value=r.indicators?.quote?.[0]?.close?.[i],day=new Date(ts*1000).toISOString().slice(0,10);if(Number.isFinite(value)&&value>0&&ts*1000<=now&&!(day===today&&end>now))closes[day]=value});
  const asOf=Object.keys(closes).sort().at(-1);if(!asOf)throw Error('No completed daily closes');
- return {currency:r.meta.currency,asOf,latest:closes[asOf],closes,source:`https://finance.yahoo.com/quote/${encodeURIComponent(symbol)}/history/`};
+ const dates=Object.keys(closes).sort(),index=r.timestamp.findIndex(ts=>new Date(ts*1000).toISOString().slice(0,10)===asOf),quote=r.indicators.quote[0],previousClose=closes[dates.at(-2)]||null;
+ return {currency:r.meta.currency,asOf,latest:closes[asOf],closes,previousClose,name:r.meta.longName||r.meta.shortName||symbol,exchange:r.meta.fullExchangeName||r.meta.exchangeName||'',instrument:r.meta.instrumentType||'',open:quote.open?.[index]??null,high:quote.high?.[index]??null,low:quote.low?.[index]??null,volume:quote.volume?.[index]??null,high52:r.meta.fiftyTwoWeekHigh??null,low52:r.meta.fiftyTwoWeekLow??null,source:`https://finance.yahoo.com/quote/${encodeURIComponent(symbol)}/history/`};
+}
+const xmlText=s=>s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,'$1').replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Math.min(Number(n),1114111))).replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&');
+export function newsRows(xml){
+ const items=[...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0,6).map(([,item])=>{const get=tag=>xmlText(item.match(new RegExp('<'+tag+'(?: [^>]*)?>([\\s\\S]*?)<\\/'+tag+'>'))?.[1]||'').trim();return {title:get('title').slice(0,220),url:get('link'),published:get('pubDate')}});
+ return items.filter(i=>i.title&&i.url.startsWith('https://')&&!isNaN(Date.parse(i.published)));
+}
+async function pricesFor(env,symbol){return cached(env,'prices-v2/'+symbol,15*60000,async()=>chartPrices(await fetchJSON(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=2y&interval=1d`),symbol))}
+const DEFAULT_WATCH=['BE','INTC','NVDA','SPY'];
+export function validateWorkspaceAction(action){
+ if(!action||!['watch','rule','deleteRule','readAlerts'].includes(action.kind))throw Error('Unknown action');
+ if(['watch','rule'].includes(action.kind)&&!symbolOK(action.symbol))throw Error('Invalid ticker');
+ if(action.kind==='watch'&&typeof action.enabled!=='boolean')throw Error('Invalid watch setting');
+ if(action.kind==='rule'&&(!['priceAbove','priceBelow','filings','cluster'].includes(action.type)||(['priceAbove','priceBelow'].includes(action.type)&&!(Number.isFinite(action.threshold)&&action.threshold>0&&action.threshold<1e9))))throw Error('Invalid alert rule');
+ if(action.kind==='deleteRule'&&(typeof action.id!=='string'||action.id.length>100))throw Error('Invalid rule');
+}
+export function evaluateRules(state,records,prices,now=Date.now()){
+ const events=[];for(const rule of state.rules){
+  if(rule.type==='filings'){
+   const matching=records.filter(r=>r.ticker===rule.symbol);const ids=matching.map(r=>r.id);const previous=new Set(rule.seen||[]);
+   if(rule.initialized){for(const row of matching.filter(r=>!previous.has(r.id))){events.push({id:'filing:'+rule.id+':'+row.id,symbol:rule.symbol,title:`${row.person} · ${row.type} ${rule.symbol}`,detail:`Traded ${row.traded}; reported ${row.filed}. Newly observed by PIF, not necessarily newly published.`,source:row.source,at:now})}}
+   rule.seen=ids;rule.initialized=true;
+  }else if(rule.type==='cluster'){
+   const recent=records.filter(r=>r.ticker===rule.symbol&&r.type==='Purchase'&&['Stock','ADR','Call options'].includes(r.asset)&&Date.parse(r.traded)>=now-30*86400000&&Date.parse(r.traded)<=now);
+   const people=[...new Set(recent.map(r=>r.person))].sort();const sig=people.join('|');
+   if(rule.initialized&&people.length>=2&&sig!==rule.signature)events.push({id:'cluster:'+rule.id+':'+sig,symbol:rule.symbol,title:`${rule.symbol} · ${people.length} buying households`,detail:`${people.join(', ')} bought in the last 30 days. Shared buying is not proof of insider information.`,at:now});
+   rule.initialized=true;rule.signature=sig;
+  }else{
+   const p=prices[rule.symbol];if(!p||p.stale||!p.value||now-p.checkedAt>30*60000||now-Date.parse(p.value.asOf)>5*86400000)continue;
+   const hit=rule.type==='priceAbove'?p.value.latest>=rule.threshold:p.value.latest<=rule.threshold;
+   if(hit&&!rule.hit)events.push({id:'price:'+rule.id+':'+p.value.asOf,symbol:rule.symbol,title:`${rule.symbol} closed ${rule.type==='priceAbove'?'above':'below'} ${rule.threshold}`,detail:`${p.value.latest.toFixed(2)} ${p.value.currency} · close ${p.value.asOf}. Daily closing-price alert.`,at:now});
+   rule.hit=hit;
+  }
+ }
+ const seen=new Set(state.alerts.map(a=>a.id));state.alerts=[...events.filter(e=>!seen.has(e.id)),...state.alerts].slice(0,100);state.evaluatedAt=now;return state;
+}
+async function workspace(request,env){
+ const url=new URL(request.url),match=request.headers.get('cookie')?.match(/(?:^|;\s*)__Host-pif_session=([a-f0-9]{64})(?:;|$)/);
+ const id=match?.[1]||[...crypto.getRandomValues(new Uint8Array(32))].map(b=>b.toString(16).padStart(2,'0')).join('');
+ const key='pif/workspaces/'+id;
+ if(request.method==='POST'&&(request.headers.get('origin')!==url.origin||!request.headers.get('content-type')?.startsWith('application/json')))return json({error:'Same-origin JSON required'},403);
+ let action=null;if(request.method==='POST'){const text=await request.text();if(text.length>4096)return json({error:'Request too large'},413);try{action=JSON.parse(text);validateWorkspaceAction(action)}catch(e){return json({error:e.message},400)}}
+ for(let attempt=0;attempt<3;attempt++){
+  const object=await env.BUCKET.get(key),state=object?await object.json():{symbols:DEFAULT_WATCH.slice(),rules:[],alerts:[],readAt:0,evaluatedAt:0};
+  if(action?.kind==='watch'){state.symbols=action.enabled?[...new Set([...state.symbols,action.symbol])]:state.symbols.filter(s=>s!==action.symbol);if(state.symbols.length>30)return json({error:'Watch up to 30 stocks'},400)}
+  if(action?.kind==='rule'){
+   if(state.rules.length>=20)return json({error:'Use up to 20 alert rules'},400);
+   if(!state.rules.some(r=>r.symbol===action.symbol&&r.type===action.type&&r.threshold===action.threshold))state.rules.push({id:crypto.randomUUID(),symbol:action.symbol,type:action.type,threshold:action.threshold,createdAt:Date.now()});
+  }
+  if(action?.kind==='deleteRule')state.rules=state.rules.filter(r=>r.id!==action.id);
+  if(action?.kind==='readAlerts')state.readAt=Date.now();
+  if(state.rules.length&&(action?.kind==='rule'||Date.now()-state.evaluatedAt>60000)){
+   const feeds=await Promise.all(['congress','executive'].map(async k=>{const o=await env.BUCKET.get('pif/v1/'+k);return o?await o.json():null}));
+   const records=feeds.flatMap(f=>f?.value?.rows||[]);const symbols=[...new Set(state.rules.filter(r=>r.type.startsWith('price')).map(r=>r.symbol))];const prices={};
+   // Use cached quotes; browser's normal update loop obtains new quotes before checking alerts.
+   for(const s of symbols){const o=await env.BUCKET.get('pif/v1/prices-v2/'+s);if(o)prices[s]=await o.json()}
+   if(feeds.every(f=>f?.value&&!f.stale&&!f.error&&Date.now()-f.checkedAt<6*HOUR))evaluateRules(state,records,prices);else{const rules=state.rules.filter(r=>r.type.startsWith('price')),evaluated=evaluateRules({...state,rules},[],prices);state.alerts=evaluated.alerts;state.evaluatedAt=evaluated.evaluatedAt}
+  }
+  const saved=await env.BUCKET.put(key,JSON.stringify(state),{onlyIf:object?{etagMatches:object.etag}:{etagDoesNotMatch:'*'}});
+  if(!saved)continue;
+  const response=json(state);response.headers.set('Set-Cookie',`__Host-pif_session=${id}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=31536000`);return response;
+ }
+ return json({error:'Workspace changed; retry'},409);
 }
 export async function cached(env,key,ttl,loader,now=Date.now()){
  if(inflight.has(key))return inflight.get(key);
@@ -86,14 +149,19 @@ export async function cached(env,key,ttl,loader,now=Date.now()){
 function json(value,status=200){return new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}})}
 export default {async fetch(request,env){
  const url=new URL(request.url);
+ if(url.pathname==='/api/workspace'&&['GET','POST'].includes(request.method)){try{return await workspace(request,env)}catch(error){console.error('Workspace failure',error.message);return json({error:'Workspace temporarily unavailable'},503)}}
  if(!['GET','HEAD'].includes(request.method))return json({error:'Method not allowed'},405);
  try{
   if(url.pathname==='/api/feed/congress')return json(await cached(env,'congress',6*HOUR,async()=>congressRows(await fetchJSON(FEED_URL))));
   if(url.pathname==='/api/feed/executive')return json(await cached(env,'executive',6*HOUR,async()=>{const raw=await fetchText(CABINET_URL,24000000);return executiveRows(cabinetCSV(raw.text,raw.modified))}));
+  if(url.pathname==='/api/news'){
+   const symbol=url.searchParams.get('symbol');if(!symbolOK(symbol))return json({error:'Invalid ticker'},400);
+   return json(await cached(env,'news/'+symbol,HOUR,async()=>({items:newsRows((await fetchText(`https://feeds.finance.yahoo.com/rss/2.0/headline?s=${encodeURIComponent(symbol)}&region=US&lang=en-US`,1000000)).text),source:'Yahoo Finance RSS'})));
+  }
   if(url.pathname==='/api/prices'){
    const symbols=[...new Set((url.searchParams.get('symbols')||'').split(','))];
    if(!symbols.length||symbols.length>6||symbols.some(s=>!symbolOK(s)))return json({error:'Use 1–6 valid ticker symbols'},400);
-   const results={};for(let i=0;i<symbols.length;i+=3){await Promise.all(symbols.slice(i,i+3).map(async s=>{results[s]=await cached(env,'prices/'+s,15*60000,async()=>chartPrices(await fetchJSON(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(s)}?range=2y&interval=1d`),s))}))}
+   const results={};for(let i=0;i<symbols.length;i+=3){await Promise.all(symbols.slice(i,i+3).map(async s=>{results[s]=await pricesFor(env,s)}))}
    return json(results);
   }
   if(url.pathname.startsWith('/api/'))return json({error:'Not found'},404);
