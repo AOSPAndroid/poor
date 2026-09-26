@@ -39,7 +39,7 @@ async function refreshLive(){
    if(value&&Array.isArray(value.rows)){
     const rows=value.rows.filter(r=>{try{validate(r);return typeof r.id==='string'}catch{return false}});
     if(value.rows.length&&!rows.length)throw Error('Invalid feed');
-    liveFeeds[name]=rows;
+    liveFeeds[name]=rows.map(r=>({...r,notes:r.notes?.replace(/Not independently rechecked by PIF\./g,'Not independently rechecked by poor.')}));
    }
    liveStatus[name]={...result,providerStale:!!value&&(value.providerCurrent===false||!value.sourceUpdatedAt||Date.now()-Date.parse(value.sourceUpdatedAt)>48*3600000)};
   }catch{liveStatus[name]={...liveStatus[name],error:true,stale:true}}

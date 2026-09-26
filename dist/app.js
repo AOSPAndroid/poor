@@ -28,7 +28,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)r
 ['search','chamber','type','sort'].forEach(id=>$('#'+id).addEventListener(id==='search'?'input':'change',()=>{page=1;renderRows()}));$('#clear').onclick=clear;$('#prev').onclick=()=>{page--;renderRows()};$('#next').onclick=()=>{page++;renderRows()};$('#bloom').onclick=()=>{clear();$('#search').value='Bloom Energy';changeView('trades');renderRows()};$('.brand').onclick=e=>{e.preventDefault();changeView('trades')};
 function csv(rows){return fields.join(',')+'\r\n'+rows.map(r=>fields.map(f=>'"'+String(r[f]??'').replace(/^[=+@\t\r]/,"'").replace(/"/g,'""')+'"').join(',')).join('\r\n')}
 function download(name,text){const blob=new Blob(['\uFEFF'+text],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
-$('#exportButton').onclick=()=>download('pif-disclosures.csv',csv(filtered()));
+$('#exportButton').onclick=()=>download('poor-disclosures.csv',csv(filtered()));
 function template(){download('disclosure-template.csv',fields.join(',')+'\r\n')}
 ['template','dialogTemplate'].forEach(id=>$('#'+id).onclick=template);
 function openImport(){$('#importStatus').textContent='Required: '+fields.filter(x=>x!=='notes').join(', ');$('#file').value='';$('#importDialog').showModal()}

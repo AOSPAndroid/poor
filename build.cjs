@@ -4,4 +4,4 @@ for(const name of fs.readdirSync('dist'))if(/\.(html|css|js)$/.test(name)){files
 fs.mkdirSync('dist/server',{recursive:true});fs.mkdirSync('dist/.openai',{recursive:true});
 fs.writeFileSync('dist/server/index.js','const FILES='+JSON.stringify(files)+';\n'+fs.readFileSync('server/worker.mjs','utf8'));
 fs.copyFileSync('.openai/hosting.json','dist/.openai/hosting.json');
-console.log('Built PIF Worker and embedded '+Object.keys(files).length+' public assets.');
+console.log('Built poor Worker and embedded '+Object.keys(files).length+' public assets.');

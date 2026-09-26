@@ -22,7 +22,7 @@ export function congressRows(feed){
  if(feed.trades.length&&!rows.length)throw Error('Disclosure format changed');
  return {rows,provider:'CongressInvests',sourceUpdatedAt:feed.last_updated||null,providerCurrent:feed.data_current===true,available:feed.total,limited:!!feed.has_more,skipped:feed.trades.length-rows.length,coverage:'Latest 500 filings rows within 365 days; source coverage may be incomplete.'};
 }
-// These eight exact company labels were previously checked for PIF's July records.
+// These eight exact company labels were previously checked for poor's July records.
 const knownTrump={'ABBOTT LABS':'ABT','ABBVIE INC':'ABBV','ACCENTURE PLC IRELAND F CLASS CLASS A':'ACN','BROADCOM INC':'AVGO','CISCO SYS INC':'CSCO','HOME DEPOT INC':'HD','META PLATFORMS INC CLASS A':'META','CHEVRON CORP NEW':'CVX'};
 export function executiveRows(feed){
  if(!Array.isArray(feed.officials))throw Error('Executive feed format changed');
@@ -35,7 +35,7 @@ export function executiveRows(feed){
   const ticker=t.resolvedTicker||t.ticker||knownTrump[t.description]||'—';
   const asset=({common_stock:'Stock',etf:'ETF'})[t.instrumentType]||(knownTrump[t.description]?'Stock':'Unclassified');
   if(!['Stock','ETF'].includes(asset)||!symbolOK(ticker)||!['Purchase','Sale'].includes(t.type)){excluded++;continue}
-  const r={id:'oc:'+t.recordId,person:'Donald Trump',chamber:'Executive',party:'R',state:'US',owner:t.accountLabel||'Not specified',ticker,company:t.description,asset,type:t.type,traded:t.date,filed:`${m[3]}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`,amount:t.amount,source,quality:'Feed summary',summarySource:'https://open-cabinet.org/officials/trump-donald-j',summaryLabel:'Open Cabinet',notes:`Filed uses the report signature date from its filename, not the OGE publication date. Open Cabinet verification: ${t.verificationState||'unspecified'}. Annual-report rows, unresolved assets and under-review rows are excluded. Not independently rechecked by PIF.`};
+  const r={id:'oc:'+t.recordId,person:'Donald Trump',chamber:'Executive',party:'R',state:'US',owner:t.accountLabel||'Not specified',ticker,company:t.description,asset,type:t.type,traded:t.date,filed:`${m[3]}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`,amount:t.amount,source,quality:'Feed summary',summarySource:'https://open-cabinet.org/officials/trump-donald-j',summaryLabel:'Open Cabinet',notes:`Filed uses the report signature date from its filename, not the OGE publication date. Open Cabinet verification: ${t.verificationState||'unspecified'}. Annual-report rows, unresolved assets and under-review rows are excluded. Not independently rechecked by poor.`};
   if(validRow(r)&&t.recordId)rows.push(r);else excluded++;
  }
  rows.sort((a,b)=>b.filed.localeCompare(a.filed)||b.traded.localeCompare(a.traded));
@@ -52,7 +52,7 @@ export function cabinetCSV(text,modified){
  return {exportedAt:modified,officials:[{slug:'trump-donald-j',transactions:rows}]};
 }
 async function fetchText(url,maxBytes=3000000){
- const response=await fetch(url,{headers:{Accept:'application/json','User-Agent':'PIF/1.0 public disclosure tracker'},signal:AbortSignal.timeout(20000)});
+ const response=await fetch(url,{headers:{Accept:'application/json','User-Agent':'poor/1.0 public disclosure tracker'},signal:AbortSignal.timeout(20000)});
  if(!response.ok)throw Error('Source returned HTTP '+response.status);
  if(Number(response.headers.get('content-length'))>maxBytes)throw Error('Source exceeds size limit');
  const reader=response.body.getReader(),decoder=new TextDecoder();let size=0,text='';
@@ -87,7 +87,7 @@ export function evaluateRules(state,records,prices,now=Date.now()){
  const events=[];for(const rule of state.rules){
   if(rule.type==='filings'){
    const matching=records.filter(r=>r.ticker===rule.symbol);const ids=matching.map(r=>r.id);const previous=new Set(rule.seen||[]);
-   if(rule.initialized){for(const row of matching.filter(r=>!previous.has(r.id))){events.push({id:'filing:'+rule.id+':'+row.id,symbol:rule.symbol,title:`${row.person} · ${row.type} ${rule.symbol}`,detail:`Traded ${row.traded}; reported ${row.filed}. Newly observed by PIF, not necessarily newly published.`,source:row.source,at:now})}}
+   if(rule.initialized){for(const row of matching.filter(r=>!previous.has(r.id))){events.push({id:'filing:'+rule.id+':'+row.id,symbol:rule.symbol,title:`${row.person} · ${row.type} ${rule.symbol}`,detail:`Traded ${row.traded}; reported ${row.filed}. Newly observed by poor, not necessarily newly published.`,source:row.source,at:now})}}
    rule.seen=ids;rule.initialized=true;
   }else if(rule.type==='cluster'){
    const recent=records.filter(r=>r.ticker===rule.symbol&&r.type==='Purchase'&&['Stock','ADR','Call options'].includes(r.asset)&&Date.parse(r.traded)>=now-30*86400000&&Date.parse(r.traded)<=now);
@@ -111,6 +111,7 @@ async function workspace(request,env){
  let action=null;if(request.method==='POST'){const text=await request.text();if(text.length>4096)return json({error:'Request too large'},413);try{action=JSON.parse(text);validateWorkspaceAction(action)}catch(e){return json({error:e.message},400)}}
  for(let attempt=0;attempt<3;attempt++){
   const object=await env.BUCKET.get(key),state=object?await object.json():{symbols:DEFAULT_WATCH.slice(),rules:[],alerts:[],readAt:0,evaluatedAt:0};
+  state.alerts=state.alerts.map(a=>({...a,detail:a.detail?.replace(/Newly observed by PIF/g,'Newly observed by poor')}));
   if(action?.kind==='watch'){state.symbols=action.enabled?[...new Set([...state.symbols,action.symbol])]:state.symbols.filter(s=>s!==action.symbol);if(state.symbols.length>30)return json({error:'Watch up to 30 stocks'},400)}
   if(action?.kind==='rule'){
    if(state.rules.length>=20)return json({error:'Use up to 20 alert rules'},400);
@@ -167,5 +168,5 @@ export default {async fetch(request,env){
   if(url.pathname.startsWith('/api/'))return json({error:'Not found'},404);
   const file=FILES[url.pathname==='/'?'/index.html':url.pathname];if(!file)return new Response('Not found',{status:404});
   return new Response(request.method==='HEAD'?null:file.body,{headers:{'Content-Type':file.type,'Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'}});
- }catch(error){console.error('PIF request failed',url.pathname,error.message);return json({error:'Service temporarily unavailable; saved data remains visible.'},503)}
+ }catch(error){console.error('poor request failed',url.pathname,error.message);return json({error:'Service temporarily unavailable; saved data remains visible.'},503)}
 }};
