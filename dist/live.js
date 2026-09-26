@@ -5,7 +5,7 @@ function sourceGroup(r){let source;try{source=decodeURIComponent(r.source).toLow
 function rebuildLiveData(){
  const seedGroups=new Set(SEED.map(sourceGroup)),seen=new Set();
  const feedRows=Object.values(liveFeeds).flat().filter(r=>!seedGroups.has(sourceGroup(r)));
- data=[...SEED,...feedRows,...imported].filter(r=>{if(seen.has(r.id))return false;seen.add(r.id);return true});render();
+ data=selectedRecords([...SEED,...feedRows,...imported]).filter(r=>{if(seen.has(r.id))return false;seen.add(r.id);return true});render();
 }
 function liveStatusView(){
  const sources=Object.entries(liveStatus),fail=sources.some(([,v])=>v.stale||v.error||v.providerStale);
@@ -34,7 +34,7 @@ async function refreshPrices(){
 }
 async function refreshLive(){
  if(liveBusy)return;liveBusy=true;liveStatusView();
- await Promise.all(['congress','executive'].map(async name=>{
+ await Promise.all(['congress'].map(async name=>{
   try{const result=await getLiveJSON('/api/feed/'+name),value=result.value;
    if(value&&Array.isArray(value.rows)){
     const rows=value.rows.filter(r=>{try{validate(r);return typeof r.id==='string'}catch{return false}});

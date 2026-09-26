@@ -1,7 +1,8 @@
 'use strict';
-let marketSymbol='BE',marketRange='6M',markerMode='disclosed',showBenchmark=true,marketRequest=0;
+let marketSymbol='BE',marketRange='6M',markerMode='traded',showBenchmark=true,marketRequest=0;
 let workspaceState={symbols:['BE','INTC','NVDA','SPY'],rules:[],alerts:[],readAt:0},workspaceReady=false,workspaceBusy=false;
-const marketNews=new Map();let plottedPoints=[];
+const chartPreferences=read('poor-chart-options',{});let showBuyMarkers=chartPreferences?.buys!==false,showDisclosureMarkers=chartPreferences?.disclosures===true;showBenchmark=chartPreferences?.benchmark!==false;
+const marketNews=new Map();let plottedPoints=[],chartGeometry=null,inspectedDate=null;
 const tickerValid=s=>/^[A-Z][A-Z0-9.-]{0,11}$/.test(s);
 const signed=n=>(n>=0?'+':'')+n.toFixed(2)+'%';
 const number=n=>Number.isFinite(n)?new Intl.NumberFormat('en-US',{notation:'compact',maximumFractionDigits:1}).format(n):'—';
@@ -17,25 +18,33 @@ function eventGroups(records,mode,points){
  for(const r of records){const day=mode==='traded'?r.traded:disclosedDate(r);if(!day||day<first||day>last)continue;if(!groups.has(day))groups.set(day,[]);groups.get(day).push(r)}return [...groups].sort((a,b)=>a[0].localeCompare(b[0]));
 }
 function renderStockChart(){
- const p=PRICES[marketSymbol],points=chartPoints(p,marketRange);plottedPoints=points;
+ const p=PRICES[marketSymbol],points=chartPoints(p,marketRange);plottedPoints=points;chartGeometry=null;
  if(points.length<10){$('#rangeReturn').textContent='';$('#markerCount').textContent='';$('#stockChart').innerHTML='<div class="chart-empty">Loading price history…</div>';$('#chartReadout').textContent='Daily closes · history unavailable until refreshed';return}
  const bench=showBenchmark?benchmarkSeries(points,PRICES.SPY):[],W=900,H=285,L=55,R=18,T=16,B=30;
  const values=[...points,...bench].map(a=>a[1]),min=Math.min(...values)*.97,max=Math.max(...values)*1.03,from=Date.parse(points[0][0]),to=Date.parse(points.at(-1)[0]);
  const x=d=>L+(Date.parse(d)-from)/Math.max(1,to-from)*(W-L-R),y=v=>T+(max-v)/Math.max(.01,max-min)*(H-T-B);
  const path=series=>series.map(([d,v],i)=>`${i?'L':'M'}${x(d).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
- let svg=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(marketSymbol)} daily close price chart, ${marketRange}. Use the date slider to inspect values."><defs><linearGradient id="priceFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#51c8c0" stop-opacity=".2"/><stop offset="100%" stop-color="#51c8c0" stop-opacity="0"/></linearGradient></defs>`;
+ let svg=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(marketSymbol)} daily close price chart, ${marketRange}. Touch or point at the chart, or use the date slider, to inspect daily closes."><defs><linearGradient id="priceFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#51c8c0" stop-opacity=".2"/><stop offset="100%" stop-color="#51c8c0" stop-opacity="0"/></linearGradient></defs>`;
  for(let i=0;i<5;i++){const v=min+(max-min)*i/4,py=y(v);svg+=`<line x1="${L}" x2="${W-R}" y1="${py}" y2="${py}" class="chart-grid"/><text x="${L-8}" y="${py+4}" text-anchor="end" class="chart-axis">${v.toFixed(v<10?2:0)}</text>`}
  for(const index of [0,Math.floor(points.length/2),points.length-1]){const d=points[index][0];svg+=`<text x="${x(d)}" y="${H-8}" text-anchor="${index===0?'start':index===points.length-1?'end':'middle'}" class="chart-axis">${esc(date(d))}</text>`}
  svg+=`<path d="${path(points)} L${x(points.at(-1)[0])},${H-B} L${x(points[0][0])},${H-B} Z" fill="url(#priceFill)"/><path d="${path(points)}" class="price-line"/>`;
  if(bench.length>1)svg+=`<path d="${path(bench)}" class="benchmark-line"/>`;
- const groups=eventGroups(stockRecords(),markerMode,points);
- groups.forEach(([day,records],i)=>{const close=points.find(([d])=>d>=day)||points.at(-1),sale=records.every(r=>r.type==='Sale');svg+=`<g class="chart-marker" data-event-date="${day}" tabindex="0" role="button" aria-label="${esc(day+' '+records.length+' '+markerMode+' events')}"><title>${esc(day+' · '+records.length+' '+markerMode+' events · '+[...new Set(records.map(r=>r.person))].join(', '))}</title><line x1="${x(day)}" x2="${x(day)}" y1="${y(close[1])+7}" y2="${H-B}" class="event-guide"/><circle cx="${x(day)}" cy="${y(close[1])}" r="6" fill="${sale?'#ef8591':'#f5bf63'}" stroke="#101a26" stroke-width="2"/></g>`});
+ chartGeometry={x,y,from,to,L,R,W,H,B,T};
+ const layers=[...(showBuyMarkers?[{mode:'traded',rows:stockRecords().filter(r=>r.type==='Purchase')}]:[]),...(showDisclosureMarkers?[{mode:'disclosed',rows:stockRecords()}]:[])];let eventCount=0;
+ for(const layer of layers){const groups=eventGroups(layer.rows,layer.mode,points);eventCount+=groups.length;
+ groups.forEach(([day,records],i)=>{const close=points.find(([d])=>d>=day)||points.at(-1),isBuy=layer.mode==='traded',py=y(close[1])+(isBuy?0:-15),names=[...new Set(records.map(r=>r.person))],label=names[0].split(' ').at(-1)+(names.length>1?' +'+(names.length-1):'');svg+=`<g class="chart-marker" data-event-date="${day}" data-event-mode="${layer.mode}" tabindex="0" role="button" aria-label="${esc(day+' '+(isBuy?'buys':'disclosures')+' '+names.join(', '))}"><title>${esc(day+' · '+names.join(', '))}</title><circle cx="${x(day)}" cy="${py}" r="15" fill="transparent"/><line x1="${x(day)}" x2="${x(day)}" y1="${py+7}" y2="${H-B}" class="event-guide"/><circle cx="${x(day)}" cy="${py}" r="6" fill="${isBuy?'#b57912':'#8d60b4'}" stroke="white" stroke-width="2"/>${isBuy&&groups.length<=12?`<text x="${x(day)}" y="${py-11}" text-anchor="${x(day)>W-110?'end':'start'}" class="marker-label">${esc(label)}</text>`:''}</g>`});}
+ svg+='<line id="chartCrosshair" class="chart-crosshair"/><circle id="chartFocus" r="4" class="chart-focus"/>';
  svg+='</svg>';$('#stockChart').innerHTML=svg;
- $('#chartScrub').max=points.length-1;$('#chartScrub').value=points.length-1;inspectChart(points.length-1);
+ $('#chartScrub').max=points.length-1;const selected=points.findIndex(([d])=>d===inspectedDate);inspectChart(selected>=0?selected:points.length-1);syncChartSwitches();
  const change=(points.at(-1)[1]/points[0][1]-1)*100;$('#rangeReturn').textContent=signed(change)+' · '+marketRange;$('#rangeReturn').className=change>=0?'gain':'loss';
- $('#markerCount').textContent=`${groups.length} ${markerMode==='traded'?'transaction':'disclosure'} dates · amber buys / pink sells`;
+ $('#markerCount').textContent=`${eventCount} marker dates · amber buys / purple disclosures · tap marker for details`;
 }
-function inspectChart(index){const point=plottedPoints[Number(index)];if(!point)return;const p=PRICES[marketSymbol],b=PRICES.SPY?.closes?.[point[0]];$('#chartReadout').textContent=`${date(point[0])} · ${marketSymbol} ${money(point[1],p?.currency||'USD')}${b?' · SPY '+money(b):''}`}
+function inspectChart(index){const point=plottedPoints[Number(index)];if(!point)return;inspectedDate=point[0];$('#chartScrub').value=index;const p=PRICES[marketSymbol],b=PRICES.SPY?.closes?.[point[0]],buyers=showBuyMarkers?[...new Set(stockRecords().filter(r=>r.type==='Purchase'&&r.traded===point[0]).map(r=>r.person))]:[];$('#chartReadout').textContent=`${date(point[0])} · ${marketSymbol} ${money(point[1],p?.currency||'USD')}${b&&showBenchmark?' · SPY '+money(b):''} · daily close${buyers.length?' · Bought: '+buyers.join(', '):''}`;if(chartGeometry){const {x,y,T,H,B}=chartGeometry,px=x(point[0]),py=y(point[1]);for(const [key,value]of Object.entries({x1:px,x2:px,y1:T,y2:H-B}))$('#chartCrosshair')?.setAttribute(key,value);$('#chartFocus')?.setAttribute('cx',px);$('#chartFocus')?.setAttribute('cy',py)}}
+function nearestChartIndex(day,points=plottedPoints){return points.reduce((best,p,i)=>Math.abs(Date.parse(p[0])-day)<Math.abs(Date.parse(points[best][0])-day)?i:best,0)}
+function inspectPointer(e){if(!chartGeometry||e.target.closest('[data-event-date]'))return;const svg=$('#stockChart svg'),matrix=svg?.getScreenCTM();if(!matrix)return;const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(matrix.inverse()),g=chartGeometry,fraction=Math.max(0,Math.min(1,(p.x-g.L)/(g.W-g.L-g.R)));inspectChart(nearestChartIndex(g.from+fraction*(g.to-g.from)))}
+function syncChartSwitches(){$('#buyMarkersToggle').checked=showBuyMarkers;$('#disclosureMarkersToggle').checked=showDisclosureMarkers;$('#benchmarkToggle').checked=showBenchmark}
+function setChartOption(key,value){if(key==='buys')showBuyMarkers=value;if(key==='disclosures')showDisclosureMarkers=value;if(key==='benchmark')showBenchmark=value;persist('poor-chart-options',{buys:showBuyMarkers,disclosures:showDisclosureMarkers,benchmark:showBenchmark});syncChartSwitches();renderStockChart()}
+
 function renderTerminal(){
  const p=PRICES[marketSymbol],records=stockRecords(),buyers=new Set(records.filter(r=>r.type==='Purchase').map(r=>r.person)),groups=clusters().filter(g=>g.ticker===marketSymbol);
  $('#stockSymbol').textContent=marketSymbol;$('#stockCompany').textContent=p?.name||records[0]?.company||marketSymbol;
@@ -54,7 +63,7 @@ function renderTerminal(){
 function renderNews(){const result=marketNews.get(marketSymbol);$('#stockNews').innerHTML=result?.items?.length?result.items.map(i=>`<article class="news-item"><a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.title)}</a><small>${esc(stamp(i.published))} · Yahoo Finance</small></article>`).join(''):`<p class="muted">${result?.error?'News unavailable. Try again after the next refresh.':'Loading headlines…'}</p>`}
 async function openStock(symbol,push=true){
  symbol=String(symbol).trim().toUpperCase();if(!tickerValid(symbol)){notify('Enter a valid ticker, such as BE or AAPL');return}
- marketSymbol=symbol;const ticket=++marketRequest;changeView('market');renderTerminal();
+ if(marketSymbol!==symbol)inspectedDate=null;marketSymbol=symbol;const ticket=++marketRequest;changeView('market');renderTerminal();
  if(push&&typeof history!=='undefined')history.pushState(null,'','#stock/'+symbol);
  await Promise.allSettled([loadMarketPrices([symbol,'SPY']),getLiveJSON('/api/news?symbol='+encodeURIComponent(symbol)).then(r=>{marketNews.set(symbol,r.value?{...r.value,stale:r.stale}:{error:true})}).catch(()=>marketNews.set(symbol,{error:true}))]);
  if(ticket===marketRequest){renderTerminal();if(!PRICES[symbol])$('#stockChart').innerHTML='<div class="chart-empty">No price history available for this ticker.</div>'}
@@ -73,14 +82,15 @@ function renderAlerts(){
  $('#alertInbox').innerHTML=workspaceState.alerts.map(a=>`<article class="alert-item ${a.at>workspaceState.readAt?'unread':''}"><button data-ticker="${esc(a.symbol)}"><strong>${esc(a.title)}</strong></button><p>${esc(a.detail)}</p><small>${esc(stamp(a.at))}${a.source?` · <a href="${esc(a.source)}" target="_blank" rel="noopener">Filing ↗</a>`:''}</small></article>`).join('')||'<div class="empty"><h2>No alerts yet</h2><p>New-filing and cluster rules establish a baseline first. Price rules check completed daily closes.</p></div>';
 }
 function openAlertForm(){if(!workspaceReady){notify('Wait for the workspace connection');return}$('#ruleSymbol').value=marketSymbol;$('#ruleThreshold').value='';$('#ruleType').value='filings';$('#thresholdLabel').hidden=true;$('#ruleStatus').textContent='';$('#alertDialog').showModal()}
-function eventDetails(day){const records=stockRecords().filter(r=>(markerMode==='traded'?r.traded:disclosedDate(r))===day);$('#detailContent').innerHTML=`<div class="eyebrow">${markerMode==='traded'?'TRANSACTIONS':'PUBLIC DISCLOSURES'}</div><h2>${esc(marketSymbol)} · ${date(day)}</h2>${records.map(r=>`<article class="event-detail"><strong>${esc(r.person)}</strong> · ${esc(r.type)} · ${esc(r.asset)}<p>${transactionLabel(r)} ${date(r.traded)}<br>Disclosed on ${disclosedDate(r)?date(disclosedDate(r)):'Unknown'}<br>${esc(r.amount)} · ${esc(r.owner)}</p><button class="secondary" data-detail="${esc(r.id)}">Full transaction</button></article>`).join('')}<p class="muted">Markers show calendar dates. On a non-trading date, the marker uses the next available closing price for display only.</p>`;$('#details').showModal()}
+function eventDetails(day,mode='traded'){const markerMode=mode;const records=stockRecords().filter(r=>(mode!=='traded'||r.type==='Purchase')&&(mode==='traded'?r.traded:disclosedDate(r))===day);$('#detailContent').innerHTML=`<div class="eyebrow">${markerMode==='traded'?'TRANSACTIONS':'PUBLIC DISCLOSURES'}</div><h2>${esc(marketSymbol)} · ${date(day)}</h2>${records.map(r=>`<article class="event-detail"><strong>${esc(r.person)}</strong> · ${esc(r.type)} · ${esc(r.asset)}<p>${transactionLabel(r)} ${date(r.traded)}<br>Disclosed on ${disclosedDate(r)?date(disclosedDate(r)):'Unknown'}<br>${esc(r.amount)} · ${esc(r.owner)}</p><button class="secondary" data-detail="${esc(r.id)}">Full transaction</button></article>`).join('')}<p class="muted">Markers show calendar dates. On a non-trading date, the marker uses the next available closing price for display only.</p>`;$('#details').showModal()}
 if(typeof window!=='undefined'){
- document.addEventListener('click',async e=>{const b=e.target.closest('button');if(b?.dataset.ticker)openStock(b.dataset.ticker);if(b?.dataset.range){marketRange=b.dataset.range;$$('[data-range]').forEach(x=>x.classList.toggle('selected',x===b));renderStockChart()}if(b?.dataset.deleteRule)await workspaceAction({kind:'deleteRule',id:b.dataset.deleteRule});const marker=e.target.closest('[data-event-date]');if(marker)eventDetails(marker.dataset.eventDate)});
- $('#stockChart').addEventListener('keydown',e=>{if(['Enter',' '].includes(e.key)&&e.target.dataset.eventDate){e.preventDefault();eventDetails(e.target.dataset.eventDate)}});
+ document.addEventListener('click',async e=>{const b=e.target.closest('button');if(b?.dataset.ticker)openStock(b.dataset.ticker);if(b?.dataset.range){marketRange=b.dataset.range;$$('[data-range]').forEach(x=>x.classList.toggle('selected',x===b));renderStockChart()}if(b?.dataset.deleteRule)await workspaceAction({kind:'deleteRule',id:b.dataset.deleteRule});const marker=e.target.closest('[data-event-date]');if(marker)eventDetails(marker.dataset.eventDate,marker.dataset.eventMode)});
+ $('#stockChart').addEventListener('keydown',e=>{if(['Enter',' '].includes(e.key)&&e.target.dataset.eventDate){e.preventDefault();eventDetails(e.target.dataset.eventDate,e.target.dataset.eventMode)}});
  $('#tickerSearch').onsubmit=e=>{e.preventDefault();openStock($('#tickerInput').value)};
  $('#openAllStockTrades').onclick=()=>{clear();$('#search').value='$'+marketSymbol;changeView('trades');renderRows()};
  $('#chartScrub').oninput=e=>inspectChart(e.target.value);
- $('#markerMode').onchange=e=>{markerMode=e.target.value;renderStockChart()};$('#benchmarkToggle').onchange=e=>{showBenchmark=e.target.checked;renderStockChart()};
+ $('#buyMarkersToggle').onchange=e=>setChartOption('buys',e.target.checked);$('#disclosureMarkersToggle').onchange=e=>setChartOption('disclosures',e.target.checked);$('#benchmarkToggle').onchange=e=>setChartOption('benchmark',e.target.checked);syncChartSwitches();
+ $('#stockChart').addEventListener('pointerdown',e=>{inspectPointer(e);if(!e.target.closest('[data-event-date]'))$('#stockChart').setPointerCapture(e.pointerId)});$('#stockChart').addEventListener('pointermove',e=>{if(e.pointerType==='mouse'||e.buttons)inspectPointer(e)});
  $('#watchStock').onclick=()=>workspaceAction({kind:'watch',symbol:marketSymbol,enabled:!workspaceState.symbols.includes(marketSymbol)});
  $('#addStockAlert').onclick=openAlertForm;$('#newAlert').onclick=openAlertForm;$('#markAlertsRead').onclick=()=>workspaceAction({kind:'readAlerts'});
  $('#ruleType').onchange=e=>$('#thresholdLabel').hidden=!e.target.value.startsWith('price');
