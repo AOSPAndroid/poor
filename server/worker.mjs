@@ -29,6 +29,7 @@ async function rosterFeed(){
  const last=pages.at(-1),normalized=congressRows({...pages[0],trades:pages.flatMap(p=>p.trades),has_more:last.has_more,data_current:pages.every(p=>p.data_current),last_updated:pages.map(p=>p.last_updated).filter(Boolean).sort()[0]});
  normalized.rows=normalized.rows.filter(r=>rosterMembers.has(r.person));normalized.coverage='Selected two-year outperformers; scanned up to 5,000 latest disclosure rows within 365 days. '+(last.has_more?'Older rows remain outside this feed.':'Reached end of available feed.');return normalized;
 }
+async function trackedRosterFeed(env){const value=await rosterFeed(),key='poor/research/political-observations',object=await env.BUCKET.get(key),seen=object?await object.json():{},now=new Date().toISOString();for(const r of value.rows){r.firstObserved=seen[r.id]||now;seen[r.id]=r.firstObserved}await env.BUCKET.put(key,JSON.stringify(seen));return value}
 // These eight exact company labels were previously checked for poor's July records.
 const knownTrump={'ABBOTT LABS':'ABT','ABBVIE INC':'ABBV','ACCENTURE PLC IRELAND F CLASS CLASS A':'ACN','BROADCOM INC':'AVGO','CISCO SYS INC':'CSCO','HOME DEPOT INC':'HD','META PLATFORMS INC CLASS A':'META','CHEVRON CORP NEW':'CVX'};
 export function executiveRows(feed){
@@ -160,12 +161,15 @@ export async function cached(env,key,ttl,loader,now=Date.now()){
  })();inflight.set(key,work);try{return await work}finally{inflight.delete(key)}
 }
 function json(value,status=200){return new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}})}
+import {researchRoute,researchIngest} from './research.mjs';
 export default {async fetch(request,env){
  const url=new URL(request.url);
+ if(url.pathname==='/api/research/ingest'&&request.method==='POST'){try{const r=await researchIngest(request,env);return json(r.body,r.status)}catch{return json({error:'Report rejected'},400)}}
  if(url.pathname==='/api/workspace'&&['GET','POST'].includes(request.method)){try{return await workspace(request,env)}catch(error){console.error('Workspace failure',error.message);return json({error:'Workspace temporarily unavailable'},503)}}
  if(!['GET','HEAD'].includes(request.method))return json({error:'Method not allowed'},405);
  try{
-  if(url.pathname==='/api/feed/congress')return json(await cached(env,'congress-roster-v1',6*HOUR,rosterFeed));
+  if(url.pathname.startsWith('/api/research')){const result=await researchRoute(url,env,cached);return json(result,result.error?400:200)}
+  if(url.pathname==='/api/feed/congress')return json(await cached(env,'congress-roster-v1',6*HOUR,()=>trackedRosterFeed(env)));
   if(url.pathname==='/api/feed/executive')return json(await cached(env,'executive',6*HOUR,async()=>{const raw=await fetchText(CABINET_URL,24000000);return executiveRows(cabinetCSV(raw.text,raw.modified))}));
   if(url.pathname==='/api/news'){
    const symbol=url.searchParams.get('symbol');if(!symbolOK(symbol))return json({error:'Invalid ticker'},400);

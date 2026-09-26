@@ -14,7 +14,7 @@ function technicals(p){
  const vols=series.slice(-21).map(([d])=>p.bars?.[d]?.volume);if(vols.length===21&&vols.every(v=>Number.isFinite(v)&&v>=0)){const base=avg(vols.slice(0,-1));if(base>0)relativeVolume=vols.at(-1)/base}
  const prior=values.slice(-21,-1);return {last,sma20:sma(20),sma50:sma(50),sma200:sma(200),rsi,atr,relativeVolume,priorHigh20:prior.length===20?Math.max(...prior):null,asOf:series.at(-1)?.[0]};
 }
-function setSwingHorizon(value){swingHorizon=value==='position'?'position':'short';persist('poor-swing-horizon',swingHorizon);renderSwing();renderContext()}
+function setSwingHorizon(value){swingHorizon=value==='position'?'position':'short';persist('poor-swing-horizon',swingHorizon);renderSwing();renderContext();if(typeof renderSector==='function'){renderSector();renderEarnings()}}
 function metric(label,value,note){return `<div class="swing-metric"><small>${esc(label)}</small><strong>${esc(value)}</strong><span>${esc(note||'')}</span></div>`}
 function renderSwing(){
  if(!$('#swingMetrics'))return;const p=PRICES[marketSymbol],t=technicals(p),n=swingHorizon==='short'?20:60,rs=relativeReturn(p,PRICES.SPY,n),ma=swingHorizon==='short'?t.sma20:t.sma50,fmt=v=>Number.isFinite(v)?money(v,p?.currency||'USD'):'—';

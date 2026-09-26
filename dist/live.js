@@ -10,7 +10,7 @@ function rebuildLiveData(){
 function liveStatusView(){
  const sources=Object.entries(liveStatus),fail=sources.some(([,v])=>v.stale||v.error||v.providerStale);
  $('.snapshot').textContent=liveBusy?'Updating feeds…':sources.length?`Auto updates · ${fail?'Check sources':'Connected'} ⓘ`:'Saved snapshot · Connecting…';
- $('.snapshot').title='Refreshes automatically while open and on return. No unattended scheduled task. Open Sources for coverage and freshness.';
+ $('.snapshot').title='Refreshes automatically while open and on return. Scheduled research status appears on Home. Open Sources for coverage and freshness.';
  const checked=[...priceChecks.values()],good=checked.filter(x=>!x.error),failed=checked.length-good.length;
  const total=new Set(data.filter(r=>r.type!=='Sale'&&/^[A-Z][A-Z0-9.-]{0,11}$/.test(r.ticker)).map(r=>r.ticker)).size;
  $('.price-note').textContent=`Prices ${good.length}/${total} checked${priceBusy?' · Updating…':failed?' · '+failed+' unavailable':''} · dates per row`;

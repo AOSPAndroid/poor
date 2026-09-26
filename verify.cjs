@@ -58,7 +58,7 @@ vm.runInContext(liveSource,context);
 run("liveFeeds.congress=[{...SEED[0],id:'feed-duplicate',quality:'Feed summary'},{...SEED[0],id:'feed-new',person:'Tom Suozzi',filed:'2026-08-22'}];rebuildLiveData()");
 assert.equal(run('data.length'),15);assert.equal(run('data.filter(r=>r.id==="feed-duplicate").length'),0);assert.equal(run('clusters().length'),1);
 run("liveStatus.congress={checkedAt:Date.now(),value:{sourceUpdatedAt:'2026-09-20',rows:[],coverage:'Limited feed'},providerStale:true};liveStatusView()");assert.ok(el('#feedStatus').innerHTML.includes('Provider data stale'));
-assert.ok(el('.snapshot').title.includes('No unattended scheduled task'));
+assert.ok(el('.snapshot').title.includes('Scheduled research status appears on Home'));
 console.log('Passed: automatic feed merge, checked-row precedence, cluster recomputation and visible freshness status.');
 run("data=[...SEED];clear();$('#search').value='Bloom Energy';renderRows()");
 assert.ok(el('#rows').innerHTML.includes('Bought on'));
