@@ -3,10 +3,10 @@ const elements=new Map();const el=s=>{if(!elements.has(s))elements.set(s,{value:
 const context={console,Date,URL,Blob,Set,Map,JSON,crypto:require('crypto').webcrypto,setTimeout,clearTimeout,localStorage:{getItem(){return null},setItem(){}},document:{querySelector:el,querySelectorAll(){return []},addEventListener(){}}};vm.createContext(context);
 vm.runInContext(fs.readFileSync('dist/data.js','utf8')+'\n'+fs.readFileSync('dist/app.js','utf8'),context);
 const run=s=>vm.runInContext(s,context);
-assert.equal(run('data.length'),28);assert.equal(run('new Set(data.map(r=>r.id)).size'),28);
+assert.equal(run('data.length'),47);assert.equal(run('new Set(data.map(r=>r.id)).size'),47);
 run('data.forEach(validate)');
 assert.equal(run('lag(SEED[0])'),28);assert.equal(run('lag(SEED[2])'),24);
-assert.equal(run('parseCSV(csv(SEED)).length'),29);
+assert.equal(run('parseCSV(csv(SEED)).length'),48);
 assert.equal(run('parseCSV(csv([{...SEED[0],notes:\'comma, quote " and \\n newline\'}]))[1][13]'),'comma, quote " and \n newline');
 assert.throws(()=>run('validate({...SEED[0],source:"javascript:alert(1)"})'));
 assert.throws(()=>run('validate({...SEED[0],traded:"2026-02-30"})'));
@@ -19,3 +19,5 @@ run("follows.add('Nancy Pelosi');renderRows()");assert.equal(run('filtered().len
 assert.ok(run('esc("<script>")').includes('&lt;'));
 for(const asset of ['styles.css','app.js','data.js'])assert.ok(fs.existsSync('dist/'+asset));
 console.log('Passed: seed integrity, date/URL validation, CSV round-trip, filters, watchlist and HTML escaping.');
+
+run("clear();$('#chamber').value='Executive';renderRows()");assert.equal(run('filtered().length'),8);assert.equal(run('new Set(data.map(r=>r.person)).size'),8);assert.ok(run("card('Warren Davidson')").includes('+78.8%'));assert.ok(run("card('Donald Trump')").includes('Executive'));run("details(data.find(r=>r.person==='Donald Trump').id)");assert.ok(el('#detailContent').innerHTML.includes('Open Cabinet'));assert.ok(!el('#detailContent').innerHTML.includes('Coldpine'));
