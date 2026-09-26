@@ -1,7 +1,7 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert');
 const elements=new Map();const el=s=>{if(!elements.has(s))elements.set(s,{value:'',innerHTML:'',textContent:'',hidden:false,classList:{toggle(){},add(){},remove(){}},addEventListener(){},showModal(){},close(){}});return elements.get(s)};
 const context={console,Date,URL,Blob,Set,Map,JSON,crypto:require('crypto').webcrypto,setTimeout,clearTimeout,localStorage:{getItem(){return null},setItem(){}},document:{querySelector:el,querySelectorAll(){return []},addEventListener(){}}};vm.createContext(context);
-vm.runInContext(fs.readFileSync('dist/data.js','utf8')+'\n'+fs.readFileSync('dist/app.js','utf8'),context);
+vm.runInContext(fs.readFileSync('dist/data.js','utf8')+'\n'+fs.readFileSync('dist/clusters.js','utf8')+'\n'+fs.readFileSync('dist/app.js','utf8'),context);
 const run=s=>vm.runInContext(s,context);
 assert.equal(run('data.length'),47);assert.equal(run('new Set(data.map(r=>r.id)).size'),47);
 run('data.forEach(validate)');
@@ -21,3 +21,21 @@ for(const asset of ['styles.css','app.js','data.js'])assert.ok(fs.existsSync('di
 console.log('Passed: seed integrity, date/URL validation, CSV round-trip, filters, watchlist and HTML escaping.');
 
 run("clear();$('#chamber').value='Executive';renderRows()");assert.equal(run('filtered().length'),8);assert.equal(run('new Set(data.map(r=>r.person)).size'),8);assert.ok(run("card('Warren Davidson')").includes('+78.8%'));assert.ok(run("card('Donald Trump')").includes('Executive'));run("details(data.find(r=>r.person==='Donald Trump').id)");assert.ok(el('#detailContent').innerHTML.includes('Open Cabinet'));assert.ok(!el('#detailContent').innerHTML.includes('Coldpine'));
+const fixture=(person,traded,extra={})=>({id:person+traded,person,traded,ticker:'TEST',asset:'Stock',type:'Purchase',...extra});
+context.testRows=[fixture('A','2026-01-01'),fixture('A','2026-01-02',{owner:'Spouse'}),fixture('B','2026-01-31')];
+assert.equal(run('buyingClusters(testRows,30)[0].count'),2);
+assert.equal(run('buyingClusters(testRows.slice(0,2),30).length'),0);
+context.testRows=[fixture('A','2026-01-01'),fixture('B','2026-01-31'),fixture('C','2026-03-02')];
+assert.equal(run('buyingClusters(testRows,30).length'),2);
+assert.ok(run('buyingClusters(testRows,30).every(g=>g.count===2)'));
+context.testRows=[fixture('A','2026-01-01'),fixture('B','2026-02-01')];assert.equal(run('buyingClusters(testRows,30).length'),0);
+context.testRows=[fixture('A','2026-01-01'),fixture('B','2026-01-01',{type:'Sale'}),fixture('C','2026-01-01',{type:'Exercise'}),fixture('D','2026-01-01',{asset:'ETF'})];assert.equal(run('buyingClusters(testRows,30).length'),0);
+context.testRows=[fixture('A','2026-01-01'),fixture('B','2026-01-01',{asset:'Call options',ticker:'test'})];assert.equal(run('buyingClusters(testRows,7)[0].count'),2);
+assert.equal(run('buyingClusters(SEED,30).length'),0);
+run("data=[...SEED,{...SEED[0],id:'test-import',person:'Test Person',quality:'User-provided'}];clear();scope='clusters';renderRows()");
+assert.equal(run('filtered().length'),5);assert.ok(el('#rows').innerHTML.includes('2 buyers'));
+run('clusterDetails(0)');assert.ok(el('#detailContent').innerHTML.includes('User-provided'));
+assert.ok(el('#detailContent').innerHTML.includes('Test Person'));
+run("$('#clusterWindow').value='7';$('#clusterWindow').onchange()");assert.equal(run('clusterDays'),7);
+run('data=[...SEED];clear()');assert.equal(run('clusters().length'),0);
+console.log('Passed: unique households, inclusive boundaries, non-chained windows, excluded trades, calls, import flags, detail evidence and window control.');
