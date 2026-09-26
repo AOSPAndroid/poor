@@ -1,9 +1,30 @@
 """poor's scheduled collector. Configuration and secrets live outside the site checkout."""
-import argparse, json, os, pathlib, re, sqlite3, subprocess, time, urllib.request
+import argparse, datetime, json, os, pathlib, re, sqlite3, subprocess, time, urllib.request
+import xml.etree.ElementTree as ET
 PROFILE=pathlib.Path(os.environ.get('LOCALAPPDATA',str(pathlib.Path.home()/'AppData/Local')))/'hermes/profiles/poor'
 CONFIG=PROFILE/'poor-research-private.json'
 STATE=PROFILE/'poor-research-state.json'
 UNIVERSE=['BE','INTC','NVDA','AAPL','MSFT','AMZN','GOOG','TSLA','AVGO','LMT','RTX','PLTR']
+COMPANIES=dict(zip(UNIVERSE,['Bloom Energy','Intel','NVIDIA','Apple','Microsoft','Amazon','Alphabet','Tesla','Broadcom','Lockheed Martin','RTX','Palantir']))
+def collect_treasury(base,token):
+    url='https://home.treasury.gov/resource-center/data-chart-center/interest-rates/pages/xml?data=daily_treasury_yield_curve&field_tdr_date_value='+str(datetime.date.today().year)
+    with urllib.request.urlopen(url,timeout=40) as r:root=ET.fromstring(r.read())
+    rows=[];ns={'m':'http://schemas.microsoft.com/ado/2007/08/dataservices/metadata','d':'http://schemas.microsoft.com/ado/2007/08/dataservices'}
+    for p in root.findall('.//m:properties',ns):
+        row={'date':p.findtext('d:NEW_DATE','',ns)[:10]}
+        for key,tag in [('m3','BC_3MONTH'),('y2','BC_2YEAR'),('y10','BC_10YEAR'),('y30','BC_30YEAR')]:
+            value=p.findtext('d:'+tag,'',ns);row[key]=float(value) if value else None
+        if row['date'] and row['y10'] is not None:rows.append(row)
+    request(base,'/api/research/ingest',{'kind':'treasury','rows':sorted(rows,key=lambda r:r['date'])[-65:]},token)
+def collect_awards(symbol,base,token):
+    now=datetime.date.today();rows=[]
+    for types in [['A','B','C','D'],['02','03','04','05']]:
+        body={'filters':{'keywords':[COMPANIES[symbol]],'award_type_codes':types,'time_period':[{'start_date':str(now-datetime.timedelta(days=365)),'end_date':str(now)}]},'fields':['Award ID','Recipient Name','Award Amount','Start Date','Awarding Agency','Description'],'limit':20,'page':1,'sort':'Start Date','order':'desc'}
+        req=urllib.request.Request('https://api.usaspending.gov/api/v2/search/spending_by_award/',data=json.dumps(body).encode(),headers={'Content-Type':'application/json','User-Agent':'poor public research collector'})
+        with urllib.request.urlopen(req,timeout=40) as r:result=json.load(r)
+        for row in result['results']:
+            row['awardKind']='Contract' if types[0]=='A' else 'Grant';rows.append(row)
+    request(base,'/api/research/ingest',{'kind':'awards','symbol':symbol,'rows':rows},token)
 def cited_urls(session,initial):
     """Only let links from actual tool results or the supplied filings reach the public app."""
     urls=set(initial)
@@ -47,12 +68,21 @@ def run(research=False,local=False):
             good+=1;return result
         except Exception:
             bad+=1;failures.append(path);return {}
-    get('/api/feed/congress');get('/api/research/treasury');get('/api/prices?symbols=SPY,QQQ,TLT,HYG,LQD,UUP')
+    get('/api/feed/congress');treasury=get('/api/research/treasury');get('/api/prices?symbols=SPY,QQQ,TLT,HYG,LQD,UUP')
+    if not treasury and not local and config.get('token'):
+        try:
+            collect_treasury(base,config['token']);good+=1;bad-=1;failures.remove('/api/research/treasury')
+        except Exception:pass
     for symbol in UNIVERSE:
         progress('Collecting '+symbol)
         get('/api/prices?symbols='+symbol)
         for source in ['sec','awards','policy','bills','earnings']:
-            get('/api/research?symbol='+symbol+'&source='+source)
+            path='/api/research?symbol='+symbol+'&source='+source
+            result=get(path)
+            if not result and source=='awards' and not local and config.get('token'):
+                try:
+                    collect_awards(symbol,base,config['token']);good+=1;bad-=1;failures.remove(path)
+                except Exception:pass
         signals=get('/api/research/signals?symbol='+symbol).get('items',[])
         for s in signals:
             if s['id'] not in old.get('researched',[]):candidates.append(s)

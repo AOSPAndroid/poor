@@ -25,6 +25,8 @@ Forward returns begin at the first available close strictly after the observatio
 
 The Windows task `poor Research Collector` runs every six hours and catches up after a missed run. It requires this PC to be awake and the user signed in. It does not require Codex or an open browser. The hosting platform does not supply an always-on scheduler for this project.
 
+USAspending and Treasury sometimes time out from the hosting network. The collector then fetches their public APIs directly and submits validated source records through the authenticated ingest endpoint. Other source failures retain last-good values and show partial/unavailable status; none is replaced by invented data.
+
 Private configuration: `%LOCALAPPDATA%/hermes/profiles/poor/poor-research-private.json` contains the Site URL and an ingest-only token. State: `poor-research-state.json` in the same profile. Neither is inside the Site archive. `/api/research/ingest` requires that token and accepts only collector status or bounded, source-linked research reports. The scheduler executes the profile's existing Python runtime. To disable: disable that named Windows task.
 
 ## Validation
