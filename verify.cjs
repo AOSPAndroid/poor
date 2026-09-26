@@ -60,3 +60,18 @@ assert.equal(run('data.length'),48);assert.equal(run('data.filter(r=>r.id==="fee
 run("liveStatus.congress={checkedAt:Date.now(),value:{sourceUpdatedAt:'2026-09-20',rows:[],coverage:'Limited feed'},providerStale:true};liveStatusView()");assert.ok(el('#feedStatus').innerHTML.includes('Provider data stale'));
 assert.ok(el('.snapshot').title.includes('No unattended scheduled task'));
 console.log('Passed: automatic feed merge, checked-row precedence, cluster recomputation and visible freshness status.');
+run("data=[...SEED];clear();$('#search').value='Bloom Energy';renderRows()");
+assert.ok(el('#rows').innerHTML.includes('Bought on'));
+assert.ok(el('#rows').innerHTML.includes('Disclosed on'));
+assert.ok(el('#rows').innerHTML.includes('28 days after trade'));
+assert.ok(el('#rows').innerHTML.includes('Bloom Energy'));
+assert.equal(run("disclosedDate(SEED.find(r=>r.person==='Donald Trump'))"),'2026-09-22');
+assert.equal(run("disclosureDelay(SEED.find(r=>r.person==='Donald Trump'))"),53);
+assert.equal(run("disclosedDate({...SEED[0],chamber:'Executive',source:'https://example.com/another.pdf'})"),null);
+assert.equal(run("transactionLabel({type:'Sale'})"),'Sold on');
+assert.equal(run("transactionLabel({type:'Exercise'})"),'Exercised on');
+run("PRICES.TEST={latest:150,asOf:'2026-09-25',currency:'USD',source:'https://finance.yahoo.com/quote/TEST/history/',closes:{'2026-07-01':100,'2026-07-15':125}};");
+assert.equal(run("disclosureReturn({...SEED[0],ticker:'TEST',traded:'2026-07-01',filed:'2026-07-15'}).pct"),19.999999999999996);
+assert.equal(run("disclosureReturn({...SEED[0],ticker:'TEST',traded:'2026-07-01',filed:'2026-07-16'})"),null);
+run("details(SEED.find(r=>r.person==='Donald Trump').id)");assert.ok(el('#detailContent').innerHTML.includes('Report signed'));assert.ok(el('#detailContent').innerHTML.includes('Sep 22, 2026'));
+console.log('Passed: labeled dates, publication vs signature, disclosure gaps, company names and disclosure-day price calculations.');

@@ -22,3 +22,15 @@ tr td::before{content:none!important}tr .price-then::before{content:'Then '!impo
 }
 
 .price-now small{display:block;font-size:12px;color:var(--muted);margin-left:0}#feedStatus{padding:8px 12px;background:#eef3f4;border-radius:4px}#feedStatus p{font-size:14px}
+
+.field-label{display:block;font-size:12px;font-weight:600;color:#536560;margin-bottom:1px}.mobile-label{display:none}.company{display:block;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#536560}.filing-link{font-size:12px}.public-return small,.price-then small{display:block;font-size:12px;color:var(--muted);margin-left:0}.public-return{font-variant-numeric:tabular-nums}.who,.what{min-width:135px}td{height:auto;padding:5px 7px}.row-details{font-size:12px;padding:3px 6px}
+@media(max-width:600px){
+tr{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px 12px;padding:9px 8px}
+tr .who{grid-column:1!important;grid-row:1!important;min-width:0}tr .open-detail{grid-column:2!important;grid-row:1!important;justify-self:end!important}
+tr .what{grid-column:1/3!important;grid-row:2!important;min-width:0}.company{display:inline;margin-left:6px;max-width:none;white-space:normal}.what small{display:inline;margin-left:6px}
+tr .when{grid-column:1!important;grid-row:3!important}tr .filed{grid-column:2!important;grid-row:3!important}.filed small{display:block!important;margin-left:0!important}tr .filed::before{content:none!important}
+tr .amount{grid-column:1/3!important;grid-row:4!important;font-size:13px!important}.amount .mobile-label{display:inline;margin-right:6px}
+tr .price-then{grid-column:1!important;grid-row:5!important}tr .price-now{grid-column:2!important;grid-row:5!important;text-align:left}tr .price-then::before,tr .price-now::before{content:none!important}
+tr .return-cell{grid-column:1!important;grid-row:6!important;text-align:left}tr .public-return{grid-column:2!important;grid-row:6!important}
+.mobile-label{display:block;font-size:12px;color:#536560;font-weight:500}.public-return small{font-size:12px}.field-label{font-size:12px}.table-scroll .empty{grid-column:1/-1}
+}
