@@ -112,8 +112,12 @@ export function evaluateRules(state,records,prices,now=Date.now()){
 }
 async function workspace(request,env){
  const url=new URL(request.url),match=request.headers.get('cookie')?.match(/(?:^|;\s*)__Host-pif_session=([a-f0-9]{64})(?:;|$)/);
+ // Identity headers are supplied and sanitized by Sites dispatch, never by the browser.
+ const userId=request.headers.get('oai-authenticated-user-id'),email=request.headers.get('oai-authenticated-user-email');
+ const user=userId&&email?{email}:null;
  const id=match?.[1]||[...crypto.getRandomValues(new Uint8Array(32))].map(b=>b.toString(16).padStart(2,'0')).join('');
- const key='pif/workspaces/'+id;
+ const accountKey=user?[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(userId)))].map(b=>b.toString(16).padStart(2,'0')).join(''):null;
+ const key=user?'poor/accounts/'+accountKey:'pif/workspaces/'+id;
  if(request.method==='POST'&&(request.headers.get('origin')!==url.origin||!request.headers.get('content-type')?.startsWith('application/json')))return json({error:'Same-origin JSON required'},403);
  let action=null;if(request.method==='POST'){const text=await request.text();if(text.length>4096)return json({error:'Request too large'},413);try{action=JSON.parse(text);validateWorkspaceAction(action)}catch(e){return json({error:e.message},400)}}
  for(let attempt=0;attempt<3;attempt++){
@@ -135,7 +139,7 @@ async function workspace(request,env){
   }
   const saved=await env.BUCKET.put(key,JSON.stringify(state),{onlyIf:object?{etagMatches:object.etag}:{etagDoesNotMatch:'*'}});
   if(!saved)continue;
-  const response=json(state);response.headers.set('Set-Cookie',`__Host-pif_session=${id}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=31536000`);return response;
+  const response=json({...state,user});if(!user)response.headers.set('Set-Cookie',`__Host-pif_session=${id}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=31536000`);return response;
  }
  return json({error:'Workspace changed; retry'},409);
 }

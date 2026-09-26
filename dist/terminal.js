@@ -73,7 +73,7 @@ async function loadMarketPrices(symbols){
 }
 async function workspaceAction(action){
  if(workspaceBusy)return;workspaceBusy=true;
- try{const r=await fetch('/api/workspace',action?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(action)}:{cache:'no-store'}),result=await r.json();if(!r.ok)throw Error(result.error||'Workspace unavailable');if(!Array.isArray(result.symbols)||!Array.isArray(result.rules))throw Error('Workspace unavailable');workspaceState=result;workspaceReady=true;$('#workspaceStatus').textContent='Saved on server · this browser';renderTerminal();return true}catch(e){$('#workspaceStatus').textContent='Workspace unavailable · retry shortly';notify(e.message);return false}finally{workspaceBusy=false}
+ try{const r=await fetch('/api/workspace',action?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(action)}:{cache:'no-store'}),result=await r.json();if(!r.ok)throw Error(result.error||'Workspace unavailable');if(!Array.isArray(result.symbols)||!Array.isArray(result.rules))throw Error('Workspace unavailable');workspaceState=result;workspaceReady=true;$('#workspaceStatus').textContent=result.user?'Synced to your ChatGPT account':'Guest · this browser';renderTerminal();if(typeof renderHome==='function')renderHome();return true}catch(e){$('#workspaceStatus').textContent='Workspace unavailable · retry shortly';notify(e.message);return false}finally{workspaceBusy=false;if(typeof renderHome==='function')renderHome()}
 }
 function ruleLabel(r){return r.type==='priceAbove'?`Close ≥ ${r.threshold}`:r.type==='priceBelow'?`Close ≤ ${r.threshold}`:r.type==='cluster'?'New 30-day buying cluster':'New disclosure'}
 function renderAlerts(){
@@ -95,7 +95,7 @@ if(typeof window!=='undefined'){
  $('#addStockAlert').onclick=openAlertForm;$('#newAlert').onclick=openAlertForm;$('#markAlertsRead').onclick=()=>workspaceAction({kind:'readAlerts'});
  $('#ruleType').onchange=e=>$('#thresholdLabel').hidden=!e.target.value.startsWith('price');
  $('#alertForm').onsubmit=async e=>{e.preventDefault();const type=$('#ruleType').value,action={kind:'rule',symbol:$('#ruleSymbol').value.trim().toUpperCase(),type};if(type.startsWith('price'))action.threshold=Number($('#ruleThreshold').value);if(await workspaceAction(action)){$('#alertDialog').close();notify('Alert rule saved')}};
- window.addEventListener('hashchange',()=>{const match=location.hash.match(/^#stock\/([A-Za-z0-9.-]+)$/);if(match)openStock(match[1],false)});
- const initial=location.hash.match(/^#stock\/([A-Za-z0-9.-]+)$/)?.[1]||'BE';
- workspaceAction().then(()=>loadMarketPrices([...workspaceState.symbols,...workspaceState.rules.map(r=>r.symbol)])).then(renderTerminal);openStock(initial,false);
+ window.addEventListener('hashchange',()=>{const match=location.hash.match(/^#stock\/([A-Za-z0-9.-]+)$/);if(match)openStock(match[1],false);else if(!location.hash)changeView('home')});
+ const initial=location.hash.match(/^#stock\/([A-Za-z0-9.-]+)$/)?.[1];
+ workspaceAction().then(()=>loadMarketPrices([...workspaceState.symbols,...workspaceState.rules.map(r=>r.symbol)])).then(renderTerminal);if(initial)openStock(initial,false);else changeView('home');
 }

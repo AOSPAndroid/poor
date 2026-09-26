@@ -26,3 +26,10 @@ assert.equal((await worker.fetch(new Request(url,{method:'POST',headers:{origin:
 const rule=await (await post({kind:'rule',symbol:'BE',type:'filings'})).json();assert.equal(rule.rules.length,1);
 const removed=await (await post({kind:'deleteRule',id:rule.rules[0].id})).json();assert.equal(removed.rules.length,0);
 console.log('Passed: durable workspace, cookie isolation, CSRF, rule validation/removal, price dedupe, filing baseline, distinct-buyer cluster, safe news URLs.');
+const identity={'oai-authenticated-user-id':'account-a','oai-authenticated-user-email':'a@example.test'};
+const accountPost=await worker.fetch(new Request(url,{method:'POST',headers:{...identity,cookie,origin:'https://pif.test','content-type':'application/json'},body:JSON.stringify({kind:'watch',symbol:'TSLA',enabled:true})}),env);
+assert.equal(accountPost.status,200);assert.equal(accountPost.headers.get('set-cookie'),null);
+const secondDevice=await (await worker.fetch(new Request(url,{headers:identity}),env)).json();assert.ok(secondDevice.symbols.includes('TSLA'));assert.ok(!secondDevice.symbols.includes('AAPL'));assert.equal(secondDevice.user.email,'a@example.test');
+const otherAccount=await (await worker.fetch(new Request(url,{headers:{...identity,'oai-authenticated-user-id':'account-b'}}),env)).json();assert.ok(!otherAccount.symbols.includes('TSLA'));
+const guest=await (await worker.fetch(new Request(url,{headers:{cookie}}),env)).json();assert.ok(!guest.symbols.includes('TSLA'));assert.equal(guest.user,null);
+console.log('Passed: signed-in cross-device bookmarks, account isolation, guest separation and no identity cookie leakage.');
