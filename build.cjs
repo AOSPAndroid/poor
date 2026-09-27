@@ -1,4 +1,5 @@
 const fs=require('node:fs'),path=require('node:path');
+require('./check-encoding.cjs').auditEncoding();
 const files={};
 const curated=require('node:vm').runInNewContext(fs.readFileSync('dist/roster.js','utf8')+'\n'+fs.readFileSync('dist/data.js','utf8')+'\nselectedRecords(SEED)');
 for(const name of fs.readdirSync('dist'))if(/\.(html|css|js)$/.test(name)){files['/'+name]={body:fs.readFileSync(path.join('dist',name),'utf8'),type:name.endsWith('.html')?'text/html; charset=utf-8':name.endsWith('.css')?'text/css; charset=utf-8':'text/javascript; charset=utf-8'}}
