@@ -18,6 +18,7 @@ function goConnected(action){
 }
 function renderConnections(){
  const el=$('#connectionBar');if(!el)return;
+ el.hidden=view==='home';if(el.hidden){el.innerHTML='';return}
  const symbol=contextStock(),person=contextPerson(),button=(action,label)=>`<button data-connect="${action}">${label}</button>`;
  el.innerHTML=`<span class="connection-stock"><b>${esc(symbol)}</b>${button('chart','Chart')}${button('stock-map','Map')}${button('stock-trades','Trades')}${button('evidence','Evidence')}${button('briefs','Research')}</span>${person?`<span class="connection-person"><b>${esc(person)}</b>${button('profile','Profile & timeline')}${button('person-map','Map')}${button('person-trades','Trades')}</span>`:''}<button class="shortcut-help" data-connect="help" title="Keyboard shortcuts (?)">Shortcuts <kbd>?</kbd></button>`;
 }
