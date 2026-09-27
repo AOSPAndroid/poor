@@ -40,3 +40,6 @@ console.log('Passed: daily article schema, unsafe URLs, stale stories, duplicate
 assert.equal((await post({kind:'daily',date:dailyArticle.published,articles:[{...dailyArticle,evidence:[dailyArticle.evidence[0]]}]})).status,400);
 assert.equal((await post({kind:'daily',date:dailyArticle.published,articles:[{...dailyArticle,evidence:dailyArticle.evidence.map(e=>({...e,kind:'policy'}))}]})).status,400);
 console.log('Passed: research rejects single-source and single-family summaries.');
+
+assert.equal((await post({kind:'daily',date:dailyArticle.published,articles:[{...dailyArticle,tldr:'word '.repeat(101)}]})).status,400);
+const compact=vm.runInContext('dailyArticlesHTML(dailyFixture)',context);assert.ok(compact.includes('Invalidated if:'));assert.ok(!compact.includes('The connection'));console.log('Passed: whole-article word limit and concise rendering.');
