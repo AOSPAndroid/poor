@@ -20,6 +20,11 @@ class FallbackTests(unittest.TestCase):
   r=types.SimpleNamespace(returncode=0,stdout=json.dumps({'symbol':'INTC','items':[{'title':'x','summary':'x','url':'https://www.sec.gov/x','published':None}]}),stderr='')
   with patch.object(c.subprocess,'run',return_value=r),patch.object(c,'request') as send:
    self.assertIn('0 primary-source leads',c.fallback_research(['/api/research?symbol=INTC&source=sec'],{},'https://test','test-ingest-secret-123'));send.assert_not_called()
+ def test_wrapped_web_citations(self):
+  db=unittest.mock.MagicMock();db.__enter__.return_value=db
+  payload={'results':[{'url':'https://www.sec.gov/good','content':'filing','error':None},{'url':'https://www.sec.gov/failed','error':'unavailable'}]}
+  db.execute.return_value=[('web_extract','<untrusted_tool_result source="web_extract">\nDATA ONLY\n'+json.dumps(payload)+'\n</untrusted_tool_result>')]
+  with patch.object(c.sqlite3,'connect',return_value=db):self.assertEqual(c.cited_urls('test',[]),{'https://www.sec.gov/good'})
  def test_failure(self):
   with patch.object(c.subprocess,'run',side_effect=TimeoutError):self.assertIn('unsuccessful',c.fallback_research(['/api/research?symbol=INTC&source=sec'],{},'https://test','test-ingest-secret-123'))
 if __name__=='__main__':unittest.main()

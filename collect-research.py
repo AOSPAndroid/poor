@@ -30,6 +30,7 @@ def cited_urls(session,initial):
     urls=set(initial)
     def walk(value):
         if isinstance(value,dict):
+            if value.get('error') or value.get('success') is False:return
             for k,v in value.items():
                 if k in ('url','link','source_url') and isinstance(v,str) and v.startswith('https://'):urls.add(v)
                 else:walk(v)
@@ -40,6 +41,9 @@ def cited_urls(session,initial):
         for name,content in c.execute("select tool_name,content from messages where session_id=? and role='tool'",(session,)):
             if name not in ('x_search','web_search','web_extract'):continue
             try:
+                if content.startswith('<untrusted_tool_result '):
+                    start=content.find('{');end=content.rfind('}')
+                    content=content[start:end+1]
                 value=json.loads(content)
                 if name=='x_search' and (not value.get('success') or value.get('degraded')):continue
                 walk(value)
