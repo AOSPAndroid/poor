@@ -105,7 +105,7 @@ assert.equal(run('Object.keys(ROSTER).length'),9);
 console.log('Passed: independent chart layers, touch coordinate boundaries, nearest trading date and roster exclusions/aliases.');
 vm.runInContext(fs.readFileSync('dist/home.js','utf8'),context);
 context.homeRows=[{type:'Purchase',traded:'2026-01-01',filed:'2026-02-01'},{type:'Sale',traded:'2026-03-01',filed:'2026-03-02'},{type:'Purchase',traded:'2026-02-01',filed:'2026-02-03'}];
-assert.equal(run('latestPurchases(homeRows).length'),2);assert.equal(run('latestPurchases(homeRows)[0].traded'),'2026-02-01');
+assert.equal(run('latestPurchases(homeRows,Date.parse("2026-03-10")).length'),2);assert.equal(run('latestPurchases(homeRows,Date.parse("2026-03-10"))[0].traded'),'2026-02-01');
 assert.ok(run("miniChart({closes:{'2026-09-01':100,'2026-09-02':110}},'TEST')").includes('one month closing prices'));
 assert.ok(run("miniChart({},'TEST')").includes('History unavailable'));
 run('renderHome()');assert.ok(el('#accountControls').innerHTML.includes('/signin-with-chatgpt?return_to=%2F'));

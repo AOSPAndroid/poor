@@ -27,10 +27,10 @@ function homeCandidates(rows,articles,prices,now=Date.now()){
   if(!p||p.stale||p.error||!(p.latest>0)||!validDate(p.asOf)||Date.parse(p.asOf)>now||now-Date.parse(p.asOf)>5*86400000||closes.length<21||closes.at(-1)?.[0]!==p.asOf)reasons.push('Fresh price history needed');
   if(p?.currency&&p.currency!=='USD')reasons.push('USD liquidity comparison unavailable');
   const volume=p?.volume*p?.latest;if(!Number.isFinite(volume))reasons.push('Trading volume unavailable');else if(volume<1000000)reasons.push('Latest-session turnover below $1m');
-  const ratings=(c&&now-Date.parse(c.date)<8*86400000?people:[]).map(n=>politicianRating(n)).filter(r=>r.score!==null&&!r.stale),rating=ratings.length?Math.max(...ratings.map(r=>r.score)):0;
+  const ratings=people.map(n=>politicianRating(n)).filter(r=>r.score!==null&&!r.stale&&r.score>=55),rating=ratings.length?Math.max(...ratings.map(r=>r.score)):0;
   results.push({symbol,buys,people,latest,a,c,review,reasons,qualified:!reasons.length,rating,volume,clock:c?.date||d,newClock:!!c&&c.date>d});
  }
- return results.sort((a,b)=>Number(b.qualified)-Number(a.qualified)||b.clock.localeCompare(a.clock)||Math.min(3,b.people.length)-Math.min(3,a.people.length)||b.rating-a.rating||a.symbol.localeCompare(b.symbol));
+ return results.sort((a,b)=>Number(b.qualified)-Number(a.qualified)||b.rating-a.rating||b.clock.localeCompare(a.clock)||Math.min(3,b.people.length)-Math.min(3,a.people.length)||b.rating-a.rating||a.symbol.localeCompare(b.symbol));
 }
 function homeObservation(rows,articles){return {at:new Date().toISOString(),trades:rows.map(r=>[r.person,r.ticker,r.type,r.traded,disclosedDate(r)].join('|')),buyers:[...new Set(rows.filter(r=>r.type==='Purchase').map(r=>r.ticker+'|'+r.person))],catalysts:articles.flatMap(a=>(a.evidence||[]).filter(e=>['insider','policy','contract','company'].includes(e.kind)).map(e=>e.url+'|'+e.date)),reviews:articles.flatMap(a=>(a.reviews||[]).filter(r=>['invalidated','challenged'].includes(r.verdict)).map(r=>a.id+'|'+r.reviewedAt+'|'+r.verdict))}}
 function homeChangeCounts(current,baseline){if(!baseline)return null;const count=k=>[...new Set(current[k])].filter(x=>!(baseline[k]||[]).includes(x)).length;return {trades:count('trades'),buyers:count('buyers'),catalysts:count('catalysts'),reviews:count('reviews')}}
