@@ -24,3 +24,7 @@ if(process.argv.includes('--network')){
  }
 }
 console.log('Passed: cache reuse, durable fallback, retry cooldown, concurrent refresh, row validation, daily close selection, API input and method restrictions.');
+
+const senators=congressRows({trades:['Ron L Wyden','Susan Collins','Dan Sullivan','Rick Scott','Austin Scott','Scott Franklin'].map(member=>({...sample,member,chamber:'Senate',link:'https://efdsearch.senate.gov/search/view/ptr/test/'}))}).rows;
+assert.deepEqual(senators.map(r=>r.person),['Ron Wyden','Susan Collins','Dan Sullivan','Rick Scott','Austin Scott','Scott Franklin']);assert.equal(senators[0].state,'OR');assert.equal(senators[3].state,'FL');
+console.log('Passed: senator aliases and no Rick Scott surname collisions.');

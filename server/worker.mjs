@@ -4,8 +4,8 @@ const CABINET_URL='https://open-cabinet.org/data/all-transactions.csv';
 const isoDate=v=>typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&!isNaN(Date.parse(v))&&new Date(v).toISOString().slice(0,10)===v;
 const symbolOK=s=>typeof s==='string'&&/^[A-Z][A-Z0-9.-]{0,11}$/.test(s);
 const safeSource=s=>{try{const u=new URL(s);return u.protocol==='https:'&&['disclosures-clerk.house.gov','efdsearch.senate.gov','extapps2.oge.gov'].includes(u.hostname)}catch{return false}};
-const partyState={'Nancy Pelosi':['D','CA'],'Josh Gottheimer':['D','NJ'],'Tommy Tuberville':['R','AL'],'Warren Davidson':['R','OH'],'Terri Sewell':['D','AL'],'Donald Norcross':['D','NJ'],'Bryan Steil':['R','WI'],'Debbie Wasserman Schultz':['D','FL'],'Tom Suozzi':['D','NY'],'Dwight Evans':['D','PA'],'Markwayne Mullin':['R','OK']};
-function canonicalName(n){const known=Object.keys(partyState).find(p=>n.toLowerCase().includes(p.split(' ').at(-1).toLowerCase()));return known||n}
+const partyState={'Nancy Pelosi':['D','CA'],'Josh Gottheimer':['D','NJ'],'Tommy Tuberville':['R','AL'],'Warren Davidson':['R','OH'],'Terri Sewell':['D','AL'],'Donald Norcross':['D','NJ'],'Bryan Steil':['R','WI'],'Debbie Wasserman Schultz':['D','FL'],'Tom Suozzi':['D','NY'],'Dwight Evans':['D','PA'],'Markwayne Mullin':['R','OK'],'Ron Wyden':['D','OR'],'Susan Collins':['R','ME'],'Dan Sullivan':['R','AK'],'Rick Scott':['R','FL']};
+function canonicalName(n){const key=n.toLowerCase().replace(/[^a-z]/g,''),aliases={ronlwyden:'Ron Wyden',ronaldwyden:'Ron Wyden',susanmcollins:'Susan Collins',danielsullivan:'Dan Sullivan',danielssullivan:'Dan Sullivan',ricklscott:'Rick Scott',richardlscott:'Rick Scott',thomasrsuozzi:'Tom Suozzi',thomassuozzi:'Tom Suozzi',debbieschultz:'Debbie Wasserman Schultz'};return aliases[key]||Object.keys(partyState).find(p=>p.toLowerCase().replace(/[^a-z]/g,'')===key)||n}
 function assetType(text){if(/\[OP\]|option|\bcall\b|\bput\b/i.test(text))return /\bcall\b/i.test(text)&&!/\bput\b/i.test(text)?'Call options':'Options';if(/\bETF\b|exchange.traded|SPDR/i.test(text))return 'ETF';if(/\bADR\b/i.test(text))return 'ADR';if(/\[ST\]|common stock/i.test(text))return 'Stock';return 'Unclassified'}
 function validRow(r){return r&&r.person&&r.person.length<150&&['House','Senate','Executive'].includes(r.chamber)&&isoDate(r.traded)&&isoDate(r.filed)&&r.traded<=r.filed&&r.filed<=new Date().toISOString().slice(0,10)&&safeSource(r.source)&&r.amount&&r.company}
 export function congressRows(feed){
@@ -22,12 +22,12 @@ export function congressRows(feed){
  if(feed.trades.length&&!rows.length)throw Error('Disclosure format changed');
  return {rows,provider:'CongressInvests',sourceUpdatedAt:feed.last_updated||null,providerCurrent:feed.data_current===true,available:feed.total,limited:!!feed.has_more,skipped:feed.trades.length-rows.length,coverage:'Latest 500 filings rows within 365 days; source coverage may be incomplete.'};
 }
-const rosterMembers=new Set(['Nancy Pelosi','Debbie Wasserman Schultz','Tom Suozzi','Dwight Evans','Markwayne Mullin']);
+const rosterMembers=new Set(['Nancy Pelosi','Debbie Wasserman Schultz','Tom Suozzi','Dwight Evans','Markwayne Mullin','Ron Wyden','Susan Collins','Dan Sullivan','Rick Scott']);
 async function rosterFeed(){
  const pages=[];let offset=0;
  for(let i=0;i<10;i++){const page=await fetchJSON(FEED_URL.replace('offset=0','offset='+offset));if(!Array.isArray(page.trades)||page.cache_loading)throw Error('Disclosure feed not ready');pages.push(page);if(!page.has_more||!page.trades.length)break;offset+=page.trades.length}
  const last=pages.at(-1),normalized=congressRows({...pages[0],trades:pages.flatMap(p=>p.trades),has_more:last.has_more,data_current:pages.every(p=>p.data_current),last_updated:pages.map(p=>p.last_updated).filter(Boolean).sort()[0]});
- normalized.rows=normalized.rows.filter(r=>rosterMembers.has(r.person));normalized.coverage='Selected two-year outperformers; scanned up to 5,000 latest disclosure rows within 365 days. '+(last.has_more?'Older rows remain outside this feed.':'Reached end of available feed.');return normalized;
+ normalized.rows=normalized.rows.filter(r=>rosterMembers.has(r.person));normalized.coverage='Nine tracked households; inclusion is not an endorsement. scanned up to 5,000 latest disclosure rows within 365 days. '+(last.has_more?'Older rows remain outside this feed.':'Reached end of available feed.');return normalized;
 }
 async function trackedRosterFeed(env){const value=await rosterFeed(),key='poor/research/political-observations',object=await env.BUCKET.get(key),seen=object?await object.json():{},now=new Date().toISOString();for(const r of value.rows){r.firstObserved=seen[r.id]||now;seen[r.id]=r.firstObserved}await env.BUCKET.put(key,JSON.stringify(seen));return value}
 // These eight exact company labels were previously checked for poor's July records.
@@ -133,7 +133,7 @@ async function workspace(request,env){
   if(action?.kind==='deleteRule')state.rules=state.rules.filter(r=>r.id!==action.id);
   if(action?.kind==='readAlerts')state.readAt=Date.now();
   if(state.rules.length&&(action?.kind==='rule'||Date.now()-state.evaluatedAt>60000)){
-   const feeds=await Promise.all(['congress-roster-v1'].map(async k=>{const o=await env.BUCKET.get('pif/v1/'+k);return o?await o.json():null}));
+   const feeds=await Promise.all(['congress-roster-v2'].map(async k=>{const o=await env.BUCKET.get('pif/v1/'+k);return o?await o.json():null}));
    const records=feeds.flatMap(f=>f?.value?.rows||[]).filter(r=>rosterMembers.has(r.person));const symbols=[...new Set(state.rules.filter(r=>r.type.startsWith('price')).map(r=>r.symbol))];const prices={};
    // Use cached quotes; browser's normal update loop obtains new quotes before checking alerts.
    for(const s of symbols){const o=await env.BUCKET.get('pif/v1/prices-v3/'+s);if(o)prices[s]=await o.json()}
@@ -169,7 +169,7 @@ export default {async fetch(request,env){
  if(!['GET','HEAD'].includes(request.method))return json({error:'Method not allowed'},405);
  try{
   if(url.pathname.startsWith('/api/research')){const result=await researchRoute(url,env,cached);return json(result,result.error?400:200)}
-  if(url.pathname==='/api/feed/congress')return json(await cached(env,'congress-roster-v1',6*HOUR,()=>trackedRosterFeed(env)));
+  if(url.pathname==='/api/feed/congress')return json(await cached(env,'congress-roster-v2',6*HOUR,()=>trackedRosterFeed(env)));
   if(url.pathname==='/api/feed/executive')return json(await cached(env,'executive',6*HOUR,async()=>{const raw=await fetchText(CABINET_URL,24000000);return executiveRows(cabinetCSV(raw.text,raw.modified))}));
   if(url.pathname==='/api/news'){
    const symbol=url.searchParams.get('symbol');if(!symbolOK(symbol))return json({error:'Invalid ticker'},400);

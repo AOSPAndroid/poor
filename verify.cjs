@@ -99,7 +99,7 @@ assert.equal(run('inspectedDate'),run('plottedPoints[0][0]'));
 run("inspectPointer({clientX:2000,clientY:30,pointerType:'touch',target:{closest(){return null}}})");
 assert.equal(run('inspectedDate'),run('plottedPoints.at(-1)[0]'));
 assert.equal(run("selectedRecords([{person:'Donald Trump'},{person:'Thomas Suozzi'}])[0].person"),'Tom Suozzi');
-assert.equal(run('Object.keys(ROSTER).length'),5);
+assert.equal(run('Object.keys(ROSTER).length'),9);
 console.log('Passed: independent chart layers, touch coordinate boundaries, nearest trading date and roster exclusions/aliases.');
 vm.runInContext(fs.readFileSync('dist/home.js','utf8'),context);
 context.homeRows=[{type:'Purchase',traded:'2026-01-01',filed:'2026-02-01'},{type:'Sale',traded:'2026-03-01',filed:'2026-03-02'},{type:'Purchase',traded:'2026-02-01',filed:'2026-02-03'}];
@@ -118,3 +118,12 @@ assert.equal(run('technicals({}).rsi'),null);assert.equal(run('technicals({}).at
 run('delete swingFixture.bars[Object.keys(swingFixture.bars).at(-5)]');assert.equal(run('technicals(swingFixture).atr'),null);
 assert.equal(run('periodReturn({},5)'),null);
 console.log('Passed: SMA windows, Wilder RSI/ATR, relative volume, prior-high exclusion, matched-date benchmark and missing-bar handling.');
+
+const sessionDates=['2026-09-02','2026-09-03','2026-09-04','2026-09-07','2026-09-08','2026-09-09','2026-09-10'];
+context.copyPrices={T:{latest:110,asOf:sessionDates.at(-1),closes:Object.fromEntries(sessionDates.map((d,i)=>[d,[50,100,120,90,100,105,110][i]]))},SPY:{closes:Object.fromEntries(sessionDates.map((d,i)=>[d,100+i]))}};
+const copy=run("trackRecord('A',{basis:'disclosed',period:'all',horizon:'5'},[trackFixture[0],trackFixture[0],{...trackFixture[0],asset:'Call options'}],copyPrices,Date.parse('2026-09-26'))");
+assert.equal(copy.count,1);assert.equal(copy.total,1);assert.ok(Math.abs(copy.avg-10)<1e-8);assert.equal(copy.win,100);assert.equal(copy.lag,1);assert.equal(copy.drawdown,-25);assert.equal(copy.benchmarkCount,1);assert.ok(Math.abs(copy.excess-(10-(106/101-1)*100))<1e-8);
+assert.equal(run("trackRecord('A',{basis:'disclosed',period:'all',horizon:'20'},[trackFixture[0]],copyPrices,Date.parse('2026-09-26')).count"),0);
+assert.equal(run("trackRecord('A',{basis:'disclosed',period:'all',horizon:'20'},[trackFixture[0]],copyPrices,Date.parse('2026-09-26')).pending"),1);
+assert.equal(run("rosterName('Ron L Wyden')"),'Ron Wyden');assert.equal(run("rosterName('Richard L Scott')"),'Rick Scott');assert.ok(!run("rosterName('Austin Scott')"));assert.ok(!run("rosterName('Scott Franklin')"));
+console.log('Passed: next-close entry, fixed forward window, immature exclusion, matched SPY, drawdown and distinct senator identities.');
