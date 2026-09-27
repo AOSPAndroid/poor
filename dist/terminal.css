@@ -21,3 +21,5 @@
 .brand{display:inline-flex;align-items:center;gap:7px;flex-shrink:0}.brand-mark{display:block;width:28px;height:28px;flex:none}@media(max-width:600px){.brand-mark{width:26px;height:26px}.brand{gap:6px}}
 
 .chart-switches{flex-wrap:wrap}.chart-switches .sale-key{color:#b63844}.chart-switches button{font-size:13px}.chart-activity[hidden]{display:none!important}
+
+.stock-actions{flex-wrap:wrap;justify-content:flex-end}.stock-actions button{white-space:nowrap}@media(max-width:600px){.stock-heading{flex-wrap:wrap}.stock-actions{justify-content:flex-start}}

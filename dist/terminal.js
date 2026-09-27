@@ -56,6 +56,7 @@ function setChartOption(key,value){if(key==='buys')showBuyMarkers=value;if(key==
 
 function renderTerminal(){
  const p=PRICES[marketSymbol],records=stockRecords(),buyers=new Set(records.filter(r=>r.type==='Purchase').map(r=>r.person)),groups=clusters().filter(g=>g.ticker===marketSymbol);
+ $('#terminalResearchMap').dataset.map=marketSymbol;$('#openStockMap').title='Open '+marketSymbol+' research map (Ctrl+M)';
  $('#stockSymbol').textContent=marketSymbol;$('#stockCompany').textContent=p?.name||records[0]?.company||marketSymbol;
  $('#stockPrice').textContent=p?money(p.latest,p.currency):'—';
  const change=p?.previousClose?(p.latest/p.previousClose-1)*100:null;
@@ -123,6 +124,7 @@ if(typeof window!=='undefined'){
  $('#stockChart').addEventListener('keydown',e=>{const m=e.target.closest('[data-event-date]');if(m&&['Enter',' '].includes(e.key)){e.preventDefault();eventDetails(m.dataset.eventDate,m.dataset.eventMode)}});
  $('#stockChart').addEventListener('pointerdown',e=>{inspectPointer(e);if(!e.target.closest('[data-event-date]'))$('#stockChart').setPointerCapture(e.pointerId)});$('#stockChart').addEventListener('pointermove',e=>{if(e.pointerType==='mouse'||e.buttons)inspectPointer(e)});
  $('#watchStock').onclick=()=>workspaceAction({kind:'watch',symbol:marketSymbol,enabled:!workspaceState.symbols.includes(marketSymbol)});
+ $('#openStockMap').onclick=()=>openResearchMap(marketSymbol);
  $('#addStockAlert').onclick=openAlertForm;$('#newAlert').onclick=openAlertForm;$('#markAlertsRead').onclick=()=>workspaceAction({kind:'readAlerts'});
  $('#ruleType').onchange=e=>$('#thresholdLabel').hidden=!e.target.value.startsWith('price');
  $('#alertForm').onsubmit=async e=>{e.preventDefault();const type=$('#ruleType').value,action={kind:'rule',symbol:$('#ruleSymbol').value.trim().toUpperCase(),type};if(type.startsWith('price'))action.threshold=Number($('#ruleThreshold').value);if(await workspaceAction(action)){$('#alertDialog').close();notify('Alert rule saved')}};
