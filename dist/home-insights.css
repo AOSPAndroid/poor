@@ -5,3 +5,5 @@ body:has(#homeView:not([hidden])) #stats{display:none}body:has(#homeView:not([hi
 .home-news{margin:10px 0 14px}.news-card h3{font-size:14px;margin:0;line-height:1.35}.news-card{border-top-width:1px}.news-card .setup-actions{flex-wrap:wrap}
 
 .home-extra{margin:14px 0}.home-extra>summary{cursor:pointer;font-size:13px;color:#466354;padding:10px;border:1px solid #dce3e1;border-radius:5px}.home-conditions h2{font-size:15px;margin:12px 0 4px}.home-market-strip{grid-template-columns:repeat(4,minmax(0,1fr))}.home-market-strip a{font-size:12px;color:#196748}.home-news .setup-grid{margin-bottom:8px}@media(max-width:700px){.home-market-strip{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.news-tickers{display:flex;flex-wrap:wrap;gap:5px;align-items:center;font-size:11px}.news-tickers button{padding:4px 6px;border:1px solid #d6e2da;border-radius:4px;color:#196748;background:#f3f8f5}.news-sources{margin-top:auto;padding-top:6px}.news-tickers>span{color:#63736b}

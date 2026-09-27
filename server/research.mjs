@@ -90,15 +90,15 @@ export function validDailyThesis(a){
  return kinds.size>=2&&urls.size>=2&&political&&primary;
 }
 export function validNewsItem(a){
- if(!a||!['title','summary','impact','watch'].every(k=>typeof a[k]==='string'&&a[k].trim()&&a[k].length<=(k==='title'?120:500)))return false;
- if(['title','summary','impact','watch'].reduce((n,k)=>n+a[k].trim().split(/\s+/).length,0)>90||!day(a.date)||a.date>today()||!['new','general','context','upcoming'].includes(a.category)||a.date<ago(['context','upcoming'].includes(a.category)?21:7))return false;
- if(!Array.isArray(a.tickers)||a.tickers.length>5||a.tickers.some(t=>!/^[A-Z][A-Z0-9.-]{0,11}$/.test(t))||!Array.isArray(a.sources)||a.sources.length<1||a.sources.length>4)return false;
+ if(!a||!['title','summary','impact','risk','watch'].every(k=>typeof a[k]==='string'&&a[k].trim()&&a[k].length<=(k==='title'?120:500)))return false;
+ if(['title','summary','impact','risk','watch'].reduce((n,k)=>n+a[k].trim().split(/\s+/).length,0)>110||!day(a.date)||a.date>today()||!['new','general','context','upcoming'].includes(a.category)||a.date<ago(['context','upcoming'].includes(a.category)?21:7))return false;
+ if(!Array.isArray(a.tickers)||!a.tickers.length||a.tickers.length>5||a.tickers.some(t=>!/^[A-Z][A-Z0-9.-]{0,11}$/.test(t))||!Array.isArray(a.sources)||a.sources.length<1||a.sources.length>4)return false;
  let independent=false;for(const u of a.sources){try{const x=new URL(u);if(x.protocol!=='https:'||x.username||x.password||!x.hostname.includes('.')||u.length>1500)return false;if(!/(^|\.)(x\.com|twitter\.com)$/.test(x.hostname))independent=true}catch{return false}}return independent;
 }
 async function ingestNews(b,env){
- if(!Array.isArray(b.items)||b.items.length>3||!b.items.every(validNewsItem))return {status:400,body:{error:'Invalid news briefing'}};
+ if(!Array.isArray(b.items)||b.items.length>5||!b.items.every(validNewsItem))return {status:400,body:{error:'Invalid news briefing'}};
  const old=await readResearch(env,'poor/research/news')||{editions:[]},now=new Date().toISOString(),known=new Set(old.editions.flatMap(e=>e.items).map(a=>[...a.sources].sort().join('|'))),items=[];
- for(const a of b.items){const key=[...a.sources].sort().join('|');if(known.has(key))continue;known.add(key);items.push({id:await researchId(key),category:a.category,title:a.title,summary:a.summary,impact:a.impact,watch:a.watch,date:a.date,tickers:a.tickers,sources:a.sources,publishedAt:now})}
+ for(const a of b.items){const key=[...a.sources].sort().join('|');if(known.has(key))continue;known.add(key);items.push({id:await researchId(key),category:a.category,title:a.title,summary:a.summary,impact:a.impact,risk:a.risk,watch:a.watch,date:a.date,tickers:a.tickers,sources:a.sources,publishedAt:now})}
  const editions=items.length?[{date:today(),publishedAt:now,items},...old.editions].slice(0,30):old.editions;
  await env.BUCKET.put('poor/research/news',JSON.stringify({editions,lastAttempt:now,status:b.status==='failed'?'Briefing update failed':items.length?'Updated':'No publishable items from this search'}));return {status:200,body:{ok:true,published:items.length}};
 }
