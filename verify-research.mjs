@@ -27,6 +27,7 @@ vm.runInContext("researchStatus={collector:{lastRun:new Date(Date.now()-9*360000
 assert.ok(elements['#collectorStatus'].innerHTML.includes('Research overdue'));assert.ok(elements['#collectorStatus'].innerHTML.includes('&lt;script>'));assert.ok(!elements['#collectorStatus'].innerHTML.includes('<script>'));
 console.log('Passed: fallback retention/deduplication, collector issues, overdue warning and escaped health output.');
 const dailyArticle={title:'Test catalyst',tldr:'A public development.',why:'Possible sector impact.',risk:'Timing uncertain.',watch:'Next public update.',tickers:['INTC'],published:new Date().toISOString().slice(0,10),sources:['https://www.sec.gov/news/test']};
+dailyArticle.sources.push('https://www.congress.gov/bill/test');Object.assign(dailyArticle,{format:2,pricedIn:'Unknown',invalidation:'Policy cancelled',horizon:'2-20 days',evidence:[{kind:'insider',fact:'Filing',date:dailyArticle.published,url:dailyArticle.sources[0]},{kind:'policy',fact:'Bill',date:dailyArticle.published,url:dailyArticle.sources[1]}]});
 assert.equal((await post({kind:'daily',date:dailyArticle.published,articles:[dailyArticle]})).body.published,1);
 assert.equal((await post({kind:'daily',date:dailyArticle.published,articles:[dailyArticle]})).body.published,0);
 assert.equal(JSON.parse(memory.get('poor/research/daily')).editions.length,1);
@@ -35,3 +36,7 @@ assert.equal((await post({kind:'daily',date:dailyArticle.published,articles:[{..
 vm.runInContext(fs.readFileSync('dist/daily.js','utf8'),context);context.dailyFixture=[{date:dailyArticle.published,articles:[{...dailyArticle,title:'<script>bad</script>'}]}];
 assert.ok(vm.runInContext('dailyArticlesHTML(dailyFixture)',context).includes('&lt;script>'));assert.ok(!vm.runInContext('dailyArticlesHTML(dailyFixture)',context).includes('<script>'));
 console.log('Passed: daily article schema, unsafe URLs, stale stories, duplicate editions and escaped rendering.');
+
+assert.equal((await post({kind:'daily',date:dailyArticle.published,articles:[{...dailyArticle,evidence:[dailyArticle.evidence[0]]}]})).status,400);
+assert.equal((await post({kind:'daily',date:dailyArticle.published,articles:[{...dailyArticle,evidence:dailyArticle.evidence.map(e=>({...e,kind:'policy'}))}]})).status,400);
+console.log('Passed: research rejects single-source and single-family summaries.');

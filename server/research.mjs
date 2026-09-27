@@ -61,7 +61,7 @@ export async function researchRoute(url,env,cache){const path=url.pathname;if(pa
  if(path==='/api/research/daily'){const o=await env.BUCKET.get('poor/research/daily');return o?await o.json():{editions:[],status:'Waiting for the first daily brief',schedule:'Daily at 08:00 Europe/Paris while the PC is awake and signed in'}};
  const symbol=url.searchParams.get('symbol');if(!/^[A-Z][A-Z0-9.-]{0,11}$/.test(symbol||''))return {error:'Invalid ticker'};
  if(path==='/api/research/signals')return evidenceSignals(env,symbol);
- if(path==='/api/research/agent'){const o=await env.BUCKET.get('poor/research/agent/'+symbol);return o?await o.json():{items:[],coverage:'No Hermes research received yet.'}}
+ if(path==='/api/research/agent'){const o=await env.BUCKET.get('poor/research/agent/'+symbol);if(!o)return {items:[],coverage:'No research received yet.'};const saved=await o.json();return {...saved,coverage:'Source-linked research leads; claims require verification and do not enter buying counts.',items:(saved.items||[]).map(i=>({...i,match:i.mode==='fallback'?'Research fallback - source lead, not a verified transaction':'Research interpretation'}))}}
  const source=url.searchParams.get('source');const loaders={sec:()=>secResearch(env,symbol,cache),awards:()=>awardResearch(env,symbol),policy:()=>policyResearch(env,symbol),bills:()=>billResearch(env,symbol),earnings:()=>earningsResearch(env,symbol,cache)};if(!loaders[source])return {error:'Unknown research source'};
  return cache(env,'research-v1/'+symbol+'/'+source,6*RHOUR,loaders[source]);}
 export function connectionSignals(politics,insiders){
@@ -76,6 +76,15 @@ async function evidenceSignals(env,symbol){const read=async key=>{const o=await 
  for(const c of found){const id=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(c.key)))).map(v=>v.toString(16).padStart(2,'0')).join('');if(!records.some(r=>r.id===id))records.push({...c,key:undefined,id,symbol,firstObserved:new Date().toISOString()})}
  const stored=records.slice(-300);if(found.length)await env.BUCKET.put('poor/research/signals/'+symbol,JSON.stringify({records:stored}));
  return {items:stored.map(r=>({...r,forward:[5,20,60].map(n=>{const ret=forwardResult(price?.value?.closes,r.firstObserved,n);const a=ret&&spy?.value?.closes?.[ret.entry],b=ret&&spy?.value?.closes?.[ret.end];return {sessions:n,...ret,excess:ret&&a>0&&b>0?ret.return-(b/a-1)*100:null}})})).reverse(),inputsCurrent,coverage:'30-calendar-day buying windows. One count per politician household; SEC owners counted separately. Forward tracking begins at the first close strictly after poor first observed the combination. 5/20/60-session returns exclude dividends, fees and execution costs. Overlapping windows are not independent samples; no probability of insider knowledge is inferred.'};}
+export function validDailyThesis(a){
+ if(!['pricedIn','invalidation','horizon'].every(k=>typeof a[k]==='string'&&a[k].trim()&&a[k].length<=800)||!Array.isArray(a.evidence)||a.evidence.length<2||a.evidence.length>4)return false;
+ const kinds=new Set(),urls=new Set();let political=false,primary=false;
+ for(const e of a.evidence){if(!e||!['political','insider','policy','contract','company','market'].includes(e.kind)||typeof e.fact!=='string'||!e.fact.trim()||e.fact.length>800||!a.sources.includes(e.url)||e.date!==null&&(!day(e.date)||e.date>today()))return false;
+  let host;try{host=new URL(e.url).hostname}catch{return false}if(['disclosures-clerk.house.gov','efdsearch.senate.gov','extapps2.oge.gov','www.sec.gov','www.federalregister.gov','www.usaspending.gov','www.congress.gov'].includes(host))primary=true;
+  kinds.add(e.kind);urls.add(e.url);if(['political','policy'].includes(e.kind))political=true;
+ }
+ return kinds.size>=2&&urls.size>=2&&political&&primary;
+}
 export async function researchIngest(request,env){
  const token=request.headers.get('Authorization');if(!env.RESEARCH_INGEST_TOKEN||token!=='Bearer '+env.RESEARCH_INGEST_TOKEN)return {status:401,body:{error:'Unauthorized'}};
  if(!(request.headers.get('Content-Type')||'').startsWith('application/json'))return {status:415,body:{error:'JSON required'}};const text=await request.text();if(text.length>100000)return {status:413,body:{error:'Too large'}};let b;try{b=JSON.parse(text)}catch{return {status:400,body:{error:'Invalid JSON'}}}
@@ -85,10 +94,11 @@ export async function researchIngest(request,env){
   for(const a of b.articles){
    if(!['title','tldr','why','risk','watch'].every(k=>typeof a[k]==='string'&&a[k].trim()&&a[k].length<=(k==='title'?160:800))||!day(a.published)||a.published>today()||a.published<ago(7)||!Array.isArray(a.tickers)||a.tickers.length>8||a.tickers.some(t=>!/^[$A-Z][A-Z0-9.-]{0,11}$/.test(t))||!Array.isArray(a.sources)||!a.sources.length||a.sources.length>4)return {status:400,body:{error:'Invalid article fields'}};
    const sources=a.sources.map(u=>{try{const x=new URL(u);return x.protocol==='https:'&&!x.username&&!x.password&&x.hostname.includes('.')&&u.length<1500?u:null}catch{return null}});if(sources.some(u=>!u))return {status:400,body:{error:'Invalid sources'}};
-   articles.push({title:a.title,tldr:a.tldr,why:a.why,risk:a.risk,watch:a.watch,published:a.published,tickers:a.tickers,sources});
+   if(!validDailyThesis(a))return {status:400,body:{error:'Research requires two evidence types, sourced facts and a testable thesis'}};
+   articles.push({title:a.title,tldr:a.tldr,why:a.why,risk:a.risk,watch:a.watch,published:a.published,tickers:a.tickers,sources,format:2,evidence:a.evidence,pricedIn:a.pricedIn,invalidation:a.invalidation,horizon:a.horizon});
   }
   const object=await env.BUCKET.get('poor/research/daily'),old=object?await object.json():{editions:[]},now=new Date().toISOString();
-  const editions=old.editions||[],known=new Set(editions.flatMap(e=>e.articles).map(a=>a.sources[0]));const fresh=articles.filter(a=>!known.has(a.sources[0]));
+  const editions=old.editions||[],known=new Set(editions.flatMap(e=>e.articles).map(a=>[...a.sources].sort().join('|')));const fresh=articles.filter(a=>!known.has([...a.sources].sort().join('|')));
   if(fresh.length)editions.unshift({date:b.date,createdAt:now,articles:fresh});
   const next={editions:editions.slice(0,30),lastAttempt:now,status:String(b.status|| (fresh.length?'Published '+fresh.length+' new briefs':'No qualifying new stories')).slice(0,300),schedule:'Daily at 08:00 Europe/Paris while the PC is awake and signed in'};
   await env.BUCKET.put('poor/research/daily',JSON.stringify(next));return {status:200,body:{ok:true,published:fresh.length}};
@@ -105,6 +115,6 @@ export async function researchIngest(request,env){
   const value={rows,url:'https://home.treasury.gov/resource-center-data-chart-center/interest-rates',unit:'percent',source:'US Treasury daily par yield curve via scheduled collector'};await env.BUCKET.put('pif/v1/treasury-v1',JSON.stringify({value,checkedAt:Date.now(),attemptedAt:Date.now(),error:null}));return {status:200,body:{ok:true}};
  }
  if(b.kind!=='agent'||!/^[A-Z][A-Z0-9.-]{0,11}$/.test(b.symbol||'')||!Array.isArray(b.items)||b.items.length>12)return {status:400,body:{error:'Invalid report'}};
- const items=b.items.map(r=>({title:String(r.title||'').slice(0,200),summary:String(r.summary||'').slice(0,1200),url:String(r.url||''),published:day(r.published)?r.published:null,firstObserved:new Date().toISOString(),kind:'agent',mode:b.mode==='fallback'?'fallback':'overlap',match:b.mode==='fallback'?'Hermes fallback - source lead, not a verified transaction':'Hermes research · unverified inference'}));if(items.some(r=>!r.title||!/^https:\/\//.test(r.url)||r.url.length>1500))return {status:400,body:{error:'Reports need HTTPS source links'}};
- const previous=await env.BUCKET.get('poor/research/agent/'+b.symbol);const existing=previous?(await previous.json()).items||[]:[];const merged=[...new Map([...items,...existing].map(i=>[i.url+'|'+i.title,i])).values()].slice(0,30);await env.BUCKET.put('poor/research/agent/'+b.symbol,JSON.stringify({items:merged,updatedAt:new Date().toISOString(),coverage:'Hermes/Grok research leads. Claims require primary-source verification; not counted in purchase signals.'}));return {status:200,body:{ok:true}};
+ const items=b.items.map(r=>({title:String(r.title||'').slice(0,200),summary:String(r.summary||'').slice(0,1200),url:String(r.url||''),published:day(r.published)?r.published:null,firstObserved:new Date().toISOString(),kind:'agent',mode:b.mode==='fallback'?'fallback':'overlap',match:b.mode==='fallback'?'Research fallback - source lead, not a verified transaction':'poor research · unverified inference'}));if(items.some(r=>!r.title||!/^https:\/\//.test(r.url)||r.url.length>1500))return {status:400,body:{error:'Reports need HTTPS source links'}};
+ const previous=await env.BUCKET.get('poor/research/agent/'+b.symbol);const existing=previous?(await previous.json()).items||[]:[];const merged=[...new Map([...items,...existing].map(i=>[i.url+'|'+i.title,i])).values()].slice(0,30);await env.BUCKET.put('poor/research/agent/'+b.symbol,JSON.stringify({items:merged,updatedAt:new Date().toISOString(),coverage:'poor research leads. Claims require primary-source verification; not counted in purchase signals.'}));return {status:200,body:{ok:true}};
 }
