@@ -18,4 +18,9 @@ assert.equal(api.overlap(peer.rows,peer.referenceRows,3),null);
 api.expand(peer.id);tree=api.tree();const nvda=tree.nodes.find(n=>n.parent?.name==='Peer'&&n.name==='NVDA');assert.ok(nvda);api.expand(nvda.id);tree=api.tree();assert.equal(tree.nodes.filter(n=>n.name==='Nancy Pelosi').length,1,'No cycle back to an ancestor');
 assert.ok(tree.nodes.every(n=>Number.isFinite(n.x)&&Number.isFinite(n.y)));
 for(let i=0;i<tree.nodes.length;i++)for(let j=i+1;j<tree.nodes.length;j++){const a=tree.nodes[i],b=tree.nodes[j];assert.ok(Math.abs(a.x-b.x)>=310||Math.abs(a.y-b.y)>=280,'Expanded cards cannot overlap')}
-console.log('Politician map: disclosure filtering, grouped transactions, timing, cycles and layout passed.');
+vm.runInContext("fixture.push(mk('Single buyer','BE','2026-01-14','j'))",ctx);
+tree=api.tree();const single=tree.nodes.find(n=>n.name==='Single buyer');api.expand(single.id);tree=api.tree();
+const gap=tree.nodes.find(n=>n.parent?.id===single.id);
+assert.equal(gap.kind,'coverage','An exhausted person branch explicitly shows a coverage gap');
+assert.equal(gap.rows.length,0,'Coverage cards never fabricate transactions');
+console.log('Politician map: disclosure filtering, grouped transactions, timing, cycles, layout and empty branch coverage passed.');
