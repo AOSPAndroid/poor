@@ -6,6 +6,7 @@ function contextStock(){return view==='map'&&mapMode==='stock'?mapTicker:marketS
 function contextPerson(){return view==='map'&&mapMode==='people'?peopleRoot:selectedPolitician}
 function goConnected(action){
  const symbol=contextStock(),person=contextPerson();
+ if(action==='chat-popover')return togglePoorChat();
  if(action==='chat'){changeView('chat');$('#chatSymbol').value=symbol;return}
  if(action==='chart')return openStock(symbol);
  if(action==='stock-map')return openResearchMap(symbol);
@@ -26,7 +27,7 @@ function renderConnections(){
 function showShortcutHelp(){
  if(document.querySelector('dialog[open]'))return;
  const rows=(items)=>items.map(([key,label])=>`<div><span>${label}</span><kbd>${key}</kbd></div>`).join('');
- $('#shortcutContent').innerHTML=`<h2>Keyboard shortcuts</h2><p>Press keys in sequence: <kbd>G</kbd>, then <kbd>T</kbd>. Shortcuts pause while typing. Tab and Enter work on every control.</p><section><h3>Anywhere</h3>${rows([['Ctrl / ⌘ K','Search stocks, people, pages & controls'],['/','Open search'],['?','This guide'],['Ctrl M','Open contextual map'],['Esc','Close dialog / cancel sequence']])}</section><section><h3>Go to a page</h3>${rows(Object.entries(PAGE_KEYS).map(([key,[,label]])=>['G '+key.toUpperCase(),label]))}</section><section><h3>Current stock · terminal</h3>${rows([['W','Watch / unwatch'],['A','Create alert'],...Object.entries(LAYER_KEYS).map(([key,[,label]])=>['X '+key.toUpperCase(),label])])}</section><section><h3>Map · focus the canvas first</h3>${rows([['Arrow keys','Pan'],['+ / −','Zoom'],['F','Fit all']])}<p>Use Ctrl / ⌘ K to find any visible button, switch, filter, chart period, or map action by name.</p></section>`;
+ $('#shortcutContent').innerHTML=`<h2>Keyboard shortcuts</h2><p>Press keys in sequence: <kbd>G</kbd>, then <kbd>T</kbd>. Shortcuts pause while typing. Tab and Enter work on every control.</p><section><h3>Anywhere</h3>${rows([['Ctrl / ⌘ K','Search stocks, people, pages & controls'],['/','Open search'],['?','This guide'],['Ctrl M','Open contextual map'],['Ctrl / ⌘ P','Open / minimize Ask poor'],['Esc','Close dialog / cancel sequence']])}</section><section><h3>Go to a page</h3>${rows(Object.entries(PAGE_KEYS).map(([key,[,label]])=>['G '+key.toUpperCase(),label]))}</section><section><h3>Current stock · terminal</h3>${rows([['W','Watch / unwatch'],['A','Create alert'],...Object.entries(LAYER_KEYS).map(([key,[,label]])=>['X '+key.toUpperCase(),label])])}</section><section><h3>Map · focus the canvas first</h3>${rows([['Arrow keys','Pan'],['+ / −','Zoom'],['F','Fit all']])}<p>Use Ctrl / ⌘ K to find any visible button, switch, filter, chart period, or map action by name.</p></section>`;
  $('#shortcutDialog').showModal();
 }
 function collectVisibleCommands(){
