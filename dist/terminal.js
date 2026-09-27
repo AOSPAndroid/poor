@@ -2,6 +2,7 @@
 let marketSymbol='BE',marketRange='6M',markerMode='traded',showBenchmark=true,marketRequest=0;
 let workspaceState={symbols:['BE','INTC','NVDA','SPY'],rules:[],alerts:[],readAt:0},workspaceReady=false,workspaceBusy=false;
 const chartPreferences=read('poor-chart-options',{});let showBuyMarkers=chartPreferences?.buys!==false,showDisclosureMarkers=chartPreferences?.disclosures!==false;showBenchmark=chartPreferences?.benchmark!==false;let showSaleMarkers=chartPreferences?.sales!==false,showChartLabels=chartPreferences?.labels!==false,showChartActivity=chartPreferences?.activity!==false;
+const marketHistoryState=new Map(),marketHistoryRequests=new Map();
 const marketNews=new Map();let plottedPoints=[],chartGeometry=null,inspectedDate=null;
 const tickerValid=s=>/^[A-Z][A-Z0-9.-]{0,11}$/.test(s);
 const signed=n=>(n>=0?'+':'')+n.toFixed(2)+'%';
@@ -23,7 +24,7 @@ function chartTradeEnabled(r){return r.type==='Sale'?showSaleMarkers:showBuyMark
 function renderChartActivity(points){$('#chartActivity').hidden=!showChartActivity;if(!showChartActivity){$('#chartActivity').innerHTML='';return}const groups=new Map();for(const r of stockRecords()){const d=disclosedDate(r),visible=chartTradeEnabled(r)&&r.traded>=points[0][0]&&r.traded<=points.at(-1)[0]||showDisclosureMarkers&&d>=points[0][0]&&d<=points.at(-1)[0];if(!visible)continue;const key=[r.person,r.type,r.traded,d].join('|');if(!groups.has(key))groups.set(key,{r,assets:new Set()});groups.get(key).assets.add(r.asset)}const rows=[...groups.values()].sort((a,b)=>b.r.traded.localeCompare(a.r.traded));const row=({r,assets})=>{const trade=chartActivityReturn(r,'traded'),pub=chartActivityReturn(r,'disclosed'),fmt=p=>p?percent(p):'—';return `<div class="chart-activity-row"><div><b>${esc(r.person)}</b>${typeof ratingBadge==='function'?ratingBadge(r.person):''}<small>${esc(r.type)} · ${esc([...assets].join(' + '))}</small></div><button data-event-date="${esc(r.traded)}" data-event-mode="${chartTradeMode(r)}"><small>${r.type==='Sale'?'Sold':r.type==='Exercise'?'Exercised':'Bought'} ${date(r.traded)}</small><strong class="${trade?(trade.pct>=0?'gain':'loss'):'muted'}">${fmt(trade)}</strong></button><button data-event-date="${esc(disclosedDate(r)||'')}" data-event-mode="disclosed" title="${pub?'From close '+date(pub.basisDate):'No post-disclosure price available'}"><small>Disclosed ${disclosedDate(r)?date(disclosedDate(r)):'unknown'}</small><strong class="${pub?(pub.pct>=0?'gain':'loss'):'muted'}">${fmt(pub)}</strong></button></div>`};$('#chartActivity').innerHTML=rows.length?`<div class="chart-activity-heading">Political activity <span>Stock change to ${date(PRICES[marketSymbol].asOf)}${PRICES[marketSymbol].stale?' · stale':''}</span></div>${rows.slice(0,4).map(row).join('')}${rows.length>4?`<details><summary>${rows.length-4} more trades</summary>${rows.slice(4).map(row).join('')}</details>`:''}<small class="chart-activity-note">Stock change since transaction / first close after disclosure. Sales show subsequent price movement, not realized profit. Options show the underlying stock.</small>`:'<p class="chart-activity-note">No trades match the date range and enabled layers.</p>'}
 function renderStockChart(){
  const p=PRICES[marketSymbol],points=chartPoints(p,marketRange);plottedPoints=points;chartGeometry=null;
- if(points.length<10){$('#rangeReturn').textContent='';$('#markerCount').textContent='';$('#stockChart').innerHTML='<div class="chart-empty">Loading price history…</div>';$('#chartActivity').innerHTML='';$('#chartReadout').textContent='Daily closes · history unavailable until refreshed';return}
+ if(points.length<10){const state=marketHistoryState.get(marketSymbol),loading=state==='loading';$('#rangeReturn').textContent='';$('#markerCount').textContent='';$('#stockChart').innerHTML=`<div class="chart-empty">${loading?'Loading price history…':'Full price history unavailable.'}${loading?'':'<br><button class="secondary" data-retry-history>Retry price history</button>'}</div>`;$('#chartActivity').innerHTML='';$('#chartScrub').disabled=true;$('#chartReadout').textContent=loading?'Fetching daily closes…':'Saved quote only · chart and indicators need more daily prices';return}$('#chartScrub').disabled=false;
  const W=Math.max(320,Math.round($('#stockChart').clientWidth||900)),mobile=W<600,H=mobile?300:285,L=mobile?42:55,R=18,T=showChartLabels?70:20,B=30,bench=showBenchmark?benchmarkSeries(points,PRICES.SPY):[];
  const values=[...points,...bench].map(a=>a[1]),min=Math.min(...values)*.97,max=Math.max(...values)*1.03,from=Date.parse(points[0][0]),to=Date.parse(points.at(-1)[0]);
  const x=d=>L+(Date.parse(d)-from)/Math.max(1,to-from)*(W-L-R),y=v=>T+(max-v)/Math.max(.01,max-min)*(H-T-B);
@@ -74,13 +75,31 @@ async function openStock(symbol,push=true){
  symbol=String(symbol).trim().toUpperCase();if(!tickerValid(symbol)){notify('Enter a valid ticker, such as BE or AAPL');return}
  if(marketSymbol!==symbol)inspectedDate=null;marketSymbol=symbol;const ticket=++marketRequest;changeView('market');renderTerminal();
  if(push&&typeof history!=='undefined')history.pushState(null,'','#stock/'+symbol);
- await Promise.allSettled([loadMarketPrices([symbol,'SPY']),getLiveJSON('/api/news?symbol='+encodeURIComponent(symbol)).then(r=>{marketNews.set(symbol,r.value?{...r.value,stale:r.stale}:{error:true})}).catch(()=>marketNews.set(symbol,{error:true}))]);
- if(ticket===marketRequest){renderTerminal();if(!PRICES[symbol])$('#stockChart').innerHTML='<div class="chart-empty">No price history available for this ticker.</div>'}
+ // Prices render independently: a slow news feed must never hold the chart open.
+ const prices=loadMarketPrices([symbol,'SPY']).then(()=>{if(ticket===marketRequest)renderTerminal()});
+ const news=getLiveJSON('/api/news?symbol='+encodeURIComponent(symbol)).then(r=>{marketNews.set(symbol,r.value?{...r.value,stale:r.stale}:{error:true})}).catch(()=>marketNews.set(symbol,{error:true})).finally(()=>{if(ticket===marketRequest)renderTerminal()});
+ await Promise.allSettled([prices,news]);
 }
 async function loadMarketPrices(symbols){
- const unique=[...new Set(symbols)].filter(tickerValid);for(let i=0;i<unique.length;i+=6){try{const result=await getLiveJSON('/api/prices?symbols='+encodeURIComponent(unique.slice(i,i+6).join(',')));for(const [s,r] of Object.entries(result))if(r.value?.latest>0&&r.value.closes)PRICES[s]={...r.value,stale:r.stale,checkedAt:r.checkedAt}}catch{}}
+ const unique=[...new Set(symbols)].filter(tickerValid);
+ for(let i=0;i<unique.length;i+=6){await Promise.all(unique.slice(i,i+6).map(s=>{
+  if(marketHistoryRequests.has(s))return marketHistoryRequests.get(s);
+  marketHistoryState.set(s,'loading');
+  const request=(async()=>{try{
+   let r;for(let attempt=0;attempt<3;attempt++){
+    const result=await getLiveJSON('/api/prices?symbols='+encodeURIComponent(s));r=result[s];
+    if(r?.value||r?.error!=='Refresh in progress')break;
+    await new Promise(resolve=>setTimeout(resolve,1500));
+   }
+   if(!(r?.value?.latest>0)||!r.value.closes)throw Error('History unavailable');
+   PRICES[s]={...r.value,stale:!!r.stale,checkedAt:r.checkedAt};
+   marketHistoryState.set(s,Object.keys(r.value.closes).length>=10?'ready':'error');
+  }catch{marketHistoryState.set(s,'error')}finally{marketHistoryRequests.delete(s);if(view==='market'&&s===marketSymbol)renderTerminal()}})();
+  marketHistoryRequests.set(s,request);return request;
+ }));}
  if(typeof refreshRatingBadges==='function')refreshRatingBadges();
 }
+
 async function workspaceAction(action){
  if(workspaceBusy)return;workspaceBusy=true;
  try{const r=await fetch('/api/workspace',action?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(action)}:{cache:'no-store'}),result=await r.json();if(!r.ok)throw Error(result.error||'Workspace unavailable');if(!Array.isArray(result.symbols)||!Array.isArray(result.rules))throw Error('Workspace unavailable');workspaceState=result;workspaceReady=true;$('#workspaceStatus').textContent=result.user?'Synced to your ChatGPT account':'Guest · this browser';renderTerminal();if(typeof renderHome==='function')renderHome();return true}catch(e){$('#workspaceStatus').textContent='Workspace unavailable · retry shortly';notify(e.message);return false}finally{workspaceBusy=false;if(typeof renderHome==='function')renderHome()}
@@ -94,7 +113,7 @@ function renderAlerts(){
 function openAlertForm(){if(!workspaceReady){notify('Wait for the workspace connection');return}$('#ruleSymbol').value=marketSymbol;$('#ruleThreshold').value='';$('#ruleType').value='filings';$('#thresholdLabel').hidden=true;$('#ruleStatus').textContent='';$('#alertDialog').showModal()}
 function eventDetails(day,mode='traded'){const markerMode=mode;const records=stockRecords().filter(r=>(mode==='sold'?r.type==='Sale':mode==='traded'?r.type==='Purchase':true)&&((mode==='traded'||mode==='sold')?r.traded:disclosedDate(r))===day);$('#detailContent').innerHTML=`<div class="eyebrow">${markerMode==='disclosed'?'PUBLIC DISCLOSURES':'TRANSACTIONS'}</div><h2>${esc(marketSymbol)} · ${date(day)}</h2>${records.map(r=>`<article class="event-detail"><strong>${esc(r.person)}</strong>${typeof ratingBadge==='function'?ratingBadge(r.person):''} · ${esc(r.type)} · ${esc(r.asset)}<p>${transactionLabel(r)} ${date(r.traded)}<br>Disclosed on ${disclosedDate(r)?date(disclosedDate(r)):'Unknown'}<br>${esc(r.amount)} · ${esc(r.owner)}</p><p class="event-returns">Since ${r.type==='Sale'?'sale':r.type==='Exercise'?'exercise':'buy'}: <b>${chartActivityReturn(r,'traded')?percent(chartActivityReturn(r,'traded')):'—'}</b> · Since disclosure: <b>${chartActivityReturn(r,'disclosed')?percent(chartActivityReturn(r,'disclosed')):'—'}</b><small> Stock price change to latest close; disclosure entry is the first close after publication. Sales show subsequent stock movement, not realized profit.</small></p><button class="secondary" data-detail="${esc(r.id)}">Full transaction</button></article>`).join('')}<p class="muted">Markers show calendar dates. On a non-trading date, the marker uses the next available closing price for display only.</p>`;$('#details').showModal()}
 if(typeof window!=='undefined'){
- document.addEventListener('click',async e=>{const b=e.target.closest('button');if(b?.dataset.ticker)openStock(b.dataset.ticker);if(b?.dataset.range){marketRange=b.dataset.range;$$('[data-range]').forEach(x=>x.classList.toggle('selected',x===b));renderStockChart()}if(b?.dataset.deleteRule)await workspaceAction({kind:'deleteRule',id:b.dataset.deleteRule});const marker=e.target.closest('[data-event-date]');if(marker)eventDetails(marker.dataset.eventDate,marker.dataset.eventMode)});
+ document.addEventListener('click',async e=>{const b=e.target.closest('button');if(b?.hasAttribute('data-retry-history')){loadMarketPrices([marketSymbol,'SPY']);renderStockChart()}if(b?.dataset.ticker)openStock(b.dataset.ticker);if(b?.dataset.range){marketRange=b.dataset.range;$$('[data-range]').forEach(x=>x.classList.toggle('selected',x===b));renderStockChart()}if(b?.dataset.deleteRule)await workspaceAction({kind:'deleteRule',id:b.dataset.deleteRule});const marker=e.target.closest('[data-event-date]');if(marker)eventDetails(marker.dataset.eventDate,marker.dataset.eventMode)});
  $('#stockChart').addEventListener('keydown',e=>{if(['Enter',' '].includes(e.key)&&e.target.dataset.eventDate){e.preventDefault();eventDetails(e.target.dataset.eventDate,e.target.dataset.eventMode)}});
  $('#tickerSearch').onsubmit=e=>{e.preventDefault();openStock($('#tickerInput').value)};
  $('#openAllStockTrades').onclick=()=>{clear();$('#search').value='$'+marketSymbol;changeView('trades');renderRows()};

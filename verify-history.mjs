@@ -1,0 +1,16 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
+const source=fs.readFileSync('dist/terminal.js','utf8');
+let calls=0,release,fail=false;
+const ctx=vm.createContext({console,Map,Set,setTimeout,PRICES:{AB:{latest:35,closes:{'2026-01-16':40}}},view:'market',marketSymbol:'AB',tickerValid:()=>true,renderTerminal(){},getLiveJSON:async()=>{calls++;await new Promise(r=>release=r);if(fail)throw Error('Offline');return {AB:{value:{latest:36,closes:Object.fromEntries(Array.from({length:20},(_,i)=>[String(i),30+i]))}}}}});
+vm.runInContext('const marketHistoryState=new Map(),marketHistoryRequests=new Map();'+source.slice(source.indexOf('async function loadMarketPrices'),source.indexOf('async function workspaceAction')),ctx);
+const a=vm.runInContext("loadMarketPrices(['AB'])",ctx),b=vm.runInContext("loadMarketPrices(['AB'])",ctx);
+assert.equal(calls,1,'Concurrent chart requests are shared');release();await Promise.all([a,b]);
+assert.equal(vm.runInContext("marketHistoryState.get('AB')",ctx),'ready');
+fail=true;const failed=vm.runInContext("loadMarketPrices(['AB'])",ctx);release();await failed;
+assert.equal(vm.runInContext("marketHistoryState.get('AB')",ctx),'error','Failure exits loading state');
+assert.equal(ctx.PRICES.AB.latest,36,'Keep usable history after failed refresh');
+fail=false;const retry=vm.runInContext("loadMarketPrices(['AB'])",ctx);release();await retry;
+assert.equal(vm.runInContext("marketHistoryState.get('AB')",ctx),'ready','Retry recovers');
+console.log('Passed: shared history requests, loading completion, failure retention and retry recovery.');
