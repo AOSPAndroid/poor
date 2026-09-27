@@ -6,3 +6,11 @@
 .daily-article .daily-bottom b{display:inline;font-size:12px;color:inherit}.daily-article .daily-bottom{font-size:12px}.daily-article .daily-tldr{margin:7px 0}.daily-article h3{font-size:16px}
 
 .shared-buy-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(225px,1fr));gap:8px}.shared-buy-card{text-align:left;border:1px solid var(--line);border-radius:7px;padding:10px;background:white}.shared-buy-card>b{display:flex;justify-content:space-between;font-size:15px}.shared-buy-card strong{color:#167455;font-size:14px}.shared-buy-card span{display:block;font-size:12px;margin:5px 0}.shared-buy-card small{font-size:11px;color:var(--muted);line-height:1.5}
+
+/* Keep owner metadata out of the adjacent asset column, including wrapped ratings. */
+.home-table td:first-child{min-width:190px;white-space:normal;vertical-align:top}
+.home-table td:first-child>.home-person{display:block}
+.home-table td:first-child>.track-rating{display:flex;width:fit-content;max-width:100%;white-space:normal;box-sizing:border-box}
+.home-table td:first-child>small{display:block;margin-left:0;overflow-wrap:anywhere}
+.home-table td:nth-child(2)>.home-ticker{display:block}
+.home-table td:nth-child(2)>small{display:block;margin-left:0;white-space:normal}
