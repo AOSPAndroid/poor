@@ -165,3 +165,17 @@ assert.ok(el('#stockChart').innerHTML.includes('disclosure-marker'));assert.ok(e
 assert.ok(el('#chartActivity').innerHTML.includes('Disclosed'));assert.ok(el('#chartActivity').innerHTML.includes('Bought'));
 run("eventDetails('2026-08-21','disclosed')");assert.ok(el('#detailContent').innerHTML.includes('Since disclosure:'));
 console.log('Passed: mobile-sized SVG, large hit targets, distinct disclosure markers, activity returns and tap detail returns.');
+
+run("signalData.push({...signalData.find(r=>r.ticker==='BE'),id:'test-sale-layer',type:'Sale',traded:'2026-07-28',filed:'2026-08-21'});marketSymbol='BE';marketRange='2Y';showBuyMarkers=false;showSaleMarkers=true;showDisclosureMarkers=false;showChartLabels=true;renderStockChart()");
+assert.ok(el('#stockChart').innerHTML.includes('sale-marker'),'Sales get their own chart layer');
+assert.ok(!el('#stockChart').innerHTML.includes('buy-marker'),'Buy layer remains off');
+run("setChartOption('labels',false)");
+assert.ok(!el('#stockChart').innerHTML.includes('class=\"marker-label'),'Labels toggle independently');
+run("setChartOption('priceOnly',true)");
+assert.ok(!el('#stockChart').innerHTML.includes('class=\"chart-marker'),'Price only hides every activity marker');
+assert.ok(!el('#stockChart').innerHTML.includes('class=\"benchmark-line'),'Price only hides SPY');
+assert.equal(el('#chartActivity').hidden,true);
+assert.ok(el('#stockChart').innerHTML.includes('class=\"price-line'),'Price only retains the stock');
+run("setChartOption('sales',true)");
+assert.ok(el('#stockChart').innerHTML.includes('sale-marker'),'Sale layer restores independently');
+console.log('Passed: independent sale layer, label toggle, clean price chart and restoring one overlay.');

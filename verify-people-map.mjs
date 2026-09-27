@@ -9,7 +9,9 @@ const mk=(person,ticker,traded,id,extra={})=>({person,ticker,traded,id,type:'Pur
 const fixture=[mk('Nancy Pelosi','BE','2026-01-01','a'),mk('Nancy Pelosi','BE','2026-01-10','b'),mk('Peer','BE','2026-01-15','c'),mk('Peer','NVDA','2026-01-20','d'),mk('Nancy Pelosi','NVDA','2026-01-22','e'),mk('Imported','BE','2026-01-20','f',{quality:'User-provided'}),mk('Seller','BE','2026-01-20','g',{type:'Sale'}),mk('Future','BE','2099-01-01','h'),mk('Unpublished','BE','2026-01-01','i',{disclosed:null})];
 globalThis.api={rows:peopleMapRows(fixture),tree:()=>peopleTree(peopleMapRows(fixture)),expand:id=>peopleExpanded.add(id),overlap:peopleOverlap};`,ctx);
 const api=ctx.api;
-assert.equal(api.rows.length,5,'Exclude imports, sales, future and unpublished records');
+assert.equal(api.rows.length,6,'Include sales; exclude imports, future and unpublished records');
+assert.equal(api.rows.filter(r=>r.type==='Sale').length,1);
+assert.equal(api.overlap(api.rows.filter(r=>r.type==='Sale'),api.rows),null,'Sales never count as shared buying');
 let tree=api.tree();assert.equal(tree.root.children.length,2,'Group repeated purchases by ticker');
 const be=tree.root.children.find(n=>n.name==='BE');assert.equal(be.rows.length,2);assert.equal(be.rows[0].id,'b','Latest transaction displayed');
 api.expand(be.id);tree=api.tree();const peer=tree.nodes.find(n=>n.name==='Peer');assert.ok(peer);assert.equal(peer.referenceRows.length,2);

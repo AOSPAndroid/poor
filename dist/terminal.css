@@ -19,3 +19,5 @@
 
 /* Connected-dot brand mark */
 .brand{display:inline-flex;align-items:center;gap:7px;flex-shrink:0}.brand-mark{display:block;width:28px;height:28px;flex:none}@media(max-width:600px){.brand-mark{width:26px;height:26px}.brand{gap:6px}}
+
+.chart-switches{flex-wrap:wrap}.chart-switches .sale-key{color:#b63844}.chart-switches button{font-size:13px}.chart-activity[hidden]{display:none!important}
