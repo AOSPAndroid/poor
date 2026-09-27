@@ -40,3 +40,9 @@ Each scheduled run classifies partial, stale, failed and unconnected feeds, incl
 Fallback reports must match the requested ticker, use a URL actually returned by that Hermes session, use the source's allowlisted public authority domain and have a valid non-future publication date (or no date). These checks establish provenance, not factual truth or a verified trade: all output remains labeled research leads, excluded from transactions, metrics and buyer counts. Existing leads are retained and deduplicated. Hermes cannot deploy code or access the ingest credential.
 
 Home shows source issues and agent outcomes, and warns after eight hours without a completed collector run. This is an in-app warning, not an external notification. The collector still runs on this PC; no cloud host was provisioned.
+
+## Daily mini articles
+
+`daily-research.py` runs Hermes once per calendar day, at 08:00 local Paris time through the Windows task `poor Daily Research`. No Hermes gateway is required. It requests 2-4 fresh source-linked briefs, with four retrieval calls requested, six agent turns and a 150-second agent budget (250-second subprocess timeout). It uses only web/X research tools. The publisher independently rejects uncited links, invalid fields, future/older-than-seven-day publication dates and previously published source URLs. The agent also receives recent stories to avoid thematic repeats; paraphrased duplicates across different source URLs can still occur.
+
+Articles are labeled AI interpretations and never enter trade or performance calculations. The public tab retains 30 editions, shows the last attempt and warns after 36 hours without a run. Failed/empty days retain earlier articles. A per-day local attempt record prevents repeated model charges from task restarts. Missing or unsupported news does not produce filler. This PC must be awake and signed in; missed schedules catch up after return.

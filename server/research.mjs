@@ -58,6 +58,7 @@ async function earningsResearch(env,symbol,cache){if(!env.ALPHA_VANTAGE_API_KEY)
  const all=await cache(env,'earnings-calendar-v1',24*RHOUR,async()=>({rows:parseCalendar(await researchFetch('https://www.alphavantage.co/query?function=EARNINGS_CALENDAR&horizon=3month&apikey='+encodeURIComponent(env.ALPHA_VANTAGE_API_KEY)))}));if(!all.value||all.stale)throw Error('Earnings provider unavailable');const items=all.value.rows.filter(r=>r.symbol===symbol&&r.reportDate>=today()).map(r=>({id:'earnings:'+symbol+':'+r.reportDate,kind:'earnings',symbol,title:'Expected earnings',traded:r.reportDate,published:null,url:'https://www.alphavantage.co/documentation/#earnings-calendar',match:'Provider ticker',note:'Expected date; confirm with investor relations. Release time not supplied.',currency:r.currency}));return {...await observed(env,symbol,'earnings',{items,coverage:items.length?'3-month provider calendar; dates can change.':'No date found in the next 3 months; this does not establish there is no earnings risk.'}),stale:all.stale};}
 export async function researchRoute(url,env,cache){const path=url.pathname;if(path==='/api/research/treasury')return cache(env,'treasury-v1',6*RHOUR,async()=>{const year=new Date().getUTCFullYear(),xml=await researchFetch('https://home.treasury.gov/resource-center/data-chart-center/interest-rates/pages/xml?data=daily_treasury_yield_curve&field_tdr_date_value='+year);return parseTreasury(xml)});
  if(path==='/api/research/status'){const o=await env.BUCKET.get('poor/research/collector');return {collector:o?await o.json():null,congressConnected:!!env.CONGRESS_API_KEY,earningsConnected:!!env.ALPHA_VANTAGE_API_KEY}}
+ if(path==='/api/research/daily'){const o=await env.BUCKET.get('poor/research/daily');return o?await o.json():{editions:[],status:'Waiting for the first daily brief',schedule:'Daily at 08:00 Europe/Paris while the PC is awake and signed in'}};
  const symbol=url.searchParams.get('symbol');if(!/^[A-Z][A-Z0-9.-]{0,11}$/.test(symbol||''))return {error:'Invalid ticker'};
  if(path==='/api/research/signals')return evidenceSignals(env,symbol);
  if(path==='/api/research/agent'){const o=await env.BUCKET.get('poor/research/agent/'+symbol);return o?await o.json():{items:[],coverage:'No Hermes research received yet.'}}
@@ -78,6 +79,20 @@ async function evidenceSignals(env,symbol){const read=async key=>{const o=await 
 export async function researchIngest(request,env){
  const token=request.headers.get('Authorization');if(!env.RESEARCH_INGEST_TOKEN||token!=='Bearer '+env.RESEARCH_INGEST_TOKEN)return {status:401,body:{error:'Unauthorized'}};
  if(!(request.headers.get('Content-Type')||'').startsWith('application/json'))return {status:415,body:{error:'JSON required'}};const text=await request.text();if(text.length>100000)return {status:413,body:{error:'Too large'}};let b;try{b=JSON.parse(text)}catch{return {status:400,body:{error:'Invalid JSON'}}}
+ if(b.kind==='daily'){
+  if(!day(b.date)||b.date>today()||!Array.isArray(b.articles)||b.articles.length>4)return {status:400,body:{error:'Invalid daily edition'}};
+  const articles=[];
+  for(const a of b.articles){
+   if(!['title','tldr','why','risk','watch'].every(k=>typeof a[k]==='string'&&a[k].trim()&&a[k].length<=(k==='title'?160:800))||!day(a.published)||a.published>today()||a.published<ago(7)||!Array.isArray(a.tickers)||a.tickers.length>8||a.tickers.some(t=>!/^[$A-Z][A-Z0-9.-]{0,11}$/.test(t))||!Array.isArray(a.sources)||!a.sources.length||a.sources.length>4)return {status:400,body:{error:'Invalid article fields'}};
+   const sources=a.sources.map(u=>{try{const x=new URL(u);return x.protocol==='https:'&&!x.username&&!x.password&&x.hostname.includes('.')&&u.length<1500?u:null}catch{return null}});if(sources.some(u=>!u))return {status:400,body:{error:'Invalid sources'}};
+   articles.push({title:a.title,tldr:a.tldr,why:a.why,risk:a.risk,watch:a.watch,published:a.published,tickers:a.tickers,sources});
+  }
+  const object=await env.BUCKET.get('poor/research/daily'),old=object?await object.json():{editions:[]},now=new Date().toISOString();
+  const editions=old.editions||[],known=new Set(editions.flatMap(e=>e.articles).map(a=>a.sources[0]));const fresh=articles.filter(a=>!known.has(a.sources[0]));
+  if(fresh.length)editions.unshift({date:b.date,createdAt:now,articles:fresh});
+  const next={editions:editions.slice(0,30),lastAttempt:now,status:String(b.status|| (fresh.length?'Published '+fresh.length+' new briefs':'No qualifying new stories')).slice(0,300),schedule:'Daily at 08:00 Europe/Paris while the PC is awake and signed in'};
+  await env.BUCKET.put('poor/research/daily',JSON.stringify(next));return {status:200,body:{ok:true,published:fresh.length}};
+ }
  if(b.kind==='collector'){const status={lastRun:new Date().toISOString(),successful:Number(b.successful)||0,failed:Number(b.failed)||0,issues:(Array.isArray(b.issues)?b.issues:[]).slice(0,100).map(i=>({path:String(i.path||'').slice(0,180),reason:String(i.reason||'').slice(0,100)})),fallbackStatus:String(b.fallbackStatus||'Not run').slice(0,300),agentStatus:String(b.agentStatus||'No new overlap').slice(0,300),schedule:'Every 6 hours while this PC is awake and you are signed in'};await env.BUCKET.put('poor/research/collector',JSON.stringify(status));return {status:200,body:{ok:true}}}
  if(b.kind==='awards'){
   if(!researchUniverse[b.symbol]||!Array.isArray(b.rows)||b.rows.length>40||b.rows.some(r=>typeof r['Recipient Name']!=='string'||r['Recipient Name'].length>300||typeof r.generated_internal_id!=='string'||!day(r['Start Date'])||!Number.isFinite(r['Award Amount'])||!['Contract','Grant'].includes(r.awardKind)))return {status:400,body:{error:'Invalid award collection'}};
