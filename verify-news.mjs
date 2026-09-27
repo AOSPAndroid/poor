@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {researchIngest,validNewsItem} from './server/research.mjs';
+const now=new Date().toISOString().slice(0,10),item={title:'Policy update',summary:'A sourced policy changed.',impact:'Costs could rise; scope remains uncertain.',watch:'Final implementation date.',date:now,tickers:['INTC'],sources:['https://www.congress.gov/bill/test']};
+assert(validNewsItem(item));assert(!validNewsItem({...item,sources:['https://x.com/example/status/1']}));assert(!validNewsItem({...item,date:'2020-01-01'}));assert(!validNewsItem({...item,sources:['javascript:alert(1)']}));
+const memory=new Map(),env={RESEARCH_INGEST_TOKEN:'test',BUCKET:{get:async k=>memory.has(k)?{json:async()=>JSON.parse(memory.get(k))}:null,put:async(k,v)=>memory.set(k,v)}};
+const post=body=>researchIngest(new Request('http://test',{method:'POST',headers:{Authorization:'Bearer test','Content-Type':'application/json'},body:JSON.stringify(body)}),env);
+assert.equal((await post({kind:'news',items:[item]})).body.published,1);
+assert.equal((await post({kind:'news',items:[item]})).body.published,0);
+await post({kind:'news',items:[],status:'failed'});
+assert.equal(JSON.parse(memory.get('poor/research/news')).editions.length,1);
+assert.equal(JSON.parse(memory.get('poor/research/news')).status,'Briefing update failed');
+console.log('Passed: fresh sourced news, X-only rejection, unsafe URLs, deduplication and archive preservation on failure.');

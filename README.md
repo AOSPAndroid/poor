@@ -98,3 +98,5 @@ A verified Pelosi backfill adds 19 stock, option, sale and exercise records from
 - In the terminal, `X` then `B/S/D/N/A/I/P` controls buys, sales, disclosures, names, activity, benchmark, or price-only mode.
 - Letter shortcuts ignore typing fields, open dialogs, repeated keys, and input composition. `Esc` cancels a pending key sequence.
 - Research reached from a stock is filtered to that ticker, with a visible **Show all research** control. Empty filtered results do not imply missing stock evidence.
+
+Daily briefing: up to three concise, sourced news items on Home, refreshed by the existing 08:00 Europe/Paris local job while the PC is awake and signed in. News has a separate once-daily budget (180 seconds, eight agent turns, four requested retrievals), includes market implications and next checks, rejects X-only sources, and preserves prior editions on failures. Run python daily-news.py for the first daily attempt; repeated same-day invocations skip model work. Validation: node verify-news.mjs.

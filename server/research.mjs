@@ -89,9 +89,23 @@ export function validDailyThesis(a){
  }
  return kinds.size>=2&&urls.size>=2&&political&&primary;
 }
+export function validNewsItem(a){
+ if(!a||!['title','summary','impact','watch'].every(k=>typeof a[k]==='string'&&a[k].trim()&&a[k].length<=(k==='title'?120:500)))return false;
+ if(['title','summary','impact','watch'].reduce((n,k)=>n+a[k].trim().split(/\s+/).length,0)>90||!day(a.date)||a.date>today()||a.date<ago(3))return false;
+ if(!Array.isArray(a.tickers)||a.tickers.length>5||a.tickers.some(t=>!/^[A-Z][A-Z0-9.-]{0,11}$/.test(t))||!Array.isArray(a.sources)||a.sources.length<1||a.sources.length>4)return false;
+ let independent=false;for(const u of a.sources){try{const x=new URL(u);if(x.protocol!=='https:'||x.username||x.password||!x.hostname.includes('.')||u.length>1500)return false;if(!/(^|\.)(x\.com|twitter\.com)$/.test(x.hostname))independent=true}catch{return false}}return independent;
+}
+async function ingestNews(b,env){
+ if(!Array.isArray(b.items)||b.items.length>3||!b.items.every(validNewsItem))return {status:400,body:{error:'Invalid news briefing'}};
+ const old=await readResearch(env,'poor/research/news')||{editions:[]},now=new Date().toISOString(),known=new Set(old.editions.flatMap(e=>e.items).map(a=>[...a.sources].sort().join('|'))),items=[];
+ for(const a of b.items){const key=[...a.sources].sort().join('|');if(known.has(key))continue;known.add(key);items.push({id:await researchId(key),title:a.title,summary:a.summary,impact:a.impact,watch:a.watch,date:a.date,tickers:a.tickers,sources:a.sources,publishedAt:now})}
+ const editions=items.length?[{date:today(),publishedAt:now,items},...old.editions].slice(0,30):old.editions;
+ await env.BUCKET.put('poor/research/news',JSON.stringify({editions,lastAttempt:now,status:b.status==='failed'?'Briefing update failed':items.length?'Updated':'No new verified items'}));return {status:200,body:{ok:true,published:items.length}};
+}
 export async function researchIngest(request,env){
  const token=request.headers.get('Authorization');if(!env.RESEARCH_INGEST_TOKEN||token!=='Bearer '+env.RESEARCH_INGEST_TOKEN)return {status:401,body:{error:'Unauthorized'}};
  if(!(request.headers.get('Content-Type')||'').startsWith('application/json'))return {status:415,body:{error:'JSON required'}};const text=await request.text();if(text.length>100000)return {status:413,body:{error:'Too large'}};let b;try{b=JSON.parse(text)}catch{return {status:400,body:{error:'Invalid JSON'}}}
+ if(b.kind==='news')return ingestNews(b,env);
  if(b.kind==='review-status'){await env.BUCKET.put('poor/research/reviewer-status',JSON.stringify({checkedAt:new Date().toISOString(),status:String(b.status||'').slice(0,200)}));return {status:200,body:{ok:true}};}
  if(b.kind==='review')return ingestReview(b,env);
  if(b.kind==='daily'){
@@ -133,7 +147,7 @@ async function dailyArchive(env){
  const saved=await readResearch(env,'poor/research/daily')||{editions:[],status:'Waiting for the first research thesis'};
  for(const e of saved.editions||[])for(const a of e.articles){a.id||=await researchId(e.createdAt+'|'+a.title+'|'+a.sources.join('|'));a.publishedAt||=e.createdAt||null;}
  const reviews=await readResearch(env,'poor/research/reviews')||{};
- return {...saved,reviewer:await readResearch(env,'poor/research/reviewer-status'),editions:(saved.editions||[]).map(e=>({...e,articles:e.articles.map(a=>({...a,reviews:reviews[a.id]||[]}))}))};
+ return {...saved,news:await readResearch(env,'poor/research/news'),reviewer:await readResearch(env,'poor/research/reviewer-status'),editions:(saved.editions||[]).map(e=>({...e,articles:e.articles.map(a=>({...a,reviews:reviews[a.id]||[]}))}))};
 }
 export function evaluateArticle(p,spy,publishedAt,locked){
  if(!publishedAt||!Number.isFinite(Date.parse(publishedAt)))return {status:'Publication time unknown'};

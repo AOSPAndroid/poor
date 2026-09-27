@@ -95,6 +95,9 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('--refresh',action='store_true');args=parser.parse_args()
     try:run(args.refresh)
     finally:
+        news=importlib.util.spec_from_file_location('news',Path(__file__).with_name('daily-news.py'));news_module=importlib.util.module_from_spec(news);news.loader.exec_module(news_module)
+        try:news_module.run()
+        except Exception:print('Daily briefing unavailable; next scheduled run will retry')
         review=importlib.util.spec_from_file_location('review',Path(__file__).with_name('athena-review.py'));module=importlib.util.module_from_spec(review);review.loader.exec_module(module)
         try:module.run()
         except Exception:print('Research follow-up unavailable; next scheduled run will retry')
