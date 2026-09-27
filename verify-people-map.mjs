@@ -26,3 +26,12 @@ const gap=tree.nodes.find(n=>n.parent?.id===single.id);
 assert.equal(gap.kind,'coverage','An exhausted person branch explicitly shows a coverage gap');
 assert.equal(gap.rows.length,0,'Coverage cards never fabricate transactions');
 console.log('Politician map: disclosure filtering, grouped transactions, timing, cycles, layout and empty branch coverage passed.');
+
+vm.runInContext(`
+const soldFixture=[mk('A','BE','2026-01-01','b',{asset:'Stock',owner:'Spouse'}),mk('A','BE','2026-01-02','s',{type:'Sale',asset:'Stock',owner:'Spouse'}),mk('A','BE','2026-01-01','o',{asset:'Call options',owner:'Spouse'}),mk('B','BE','2026-01-01','p',{asset:'Stock',owner:'Self'})];
+globalThis.soldChecks={hidden:filterMapPositions(soldFixture,false,true).map(r=>r.id),events:filterMapPositions(soldFixture,true,false).map(r=>r.id),reopened:filterMapPositions([...soldFixture,mk('A','BE','2026-01-03','new',{asset:'Stock',owner:'Spouse'})],false,true).length,sameDay:filterMapPositions([soldFixture[0],{...soldFixture[1],traded:'2026-01-01'}],false,true).length};`,ctx);
+assert.equal(ctx.soldChecks.hidden.join(','),'o,p','Hide sold stock, retain separate instrument and other household');
+assert.equal(ctx.soldChecks.events.join(','),'b,o,p','Sale event switch retains buys');
+assert.equal(ctx.soldChecks.reopened,5,'Later buy restores a position');
+assert.equal(ctx.soldChecks.sameDay,0,'Same-day sale remains uncertain');
+console.log('Passed: sale filters, household/instrument separation, repurchases and same-day ambiguity.');
