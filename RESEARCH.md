@@ -32,3 +32,11 @@ Private configuration: `%LOCALAPPDATA%/hermes/profiles/poor/poor-research-privat
 ## Validation
 
 `node verify.cjs`, `node verify-worker.mjs`, `node verify-terminal.mjs`, `node verify-research.mjs`, then `node build.cjs`. The research suite covers transaction classification, missing values, issuer matching, amendments, distinct buyers, time windows, return timing, recipient normalization, CSV parsing, missing yields, ingest authorization, and long/short position sizing. Real SEC, Treasury, Federal Register and USAspending responses were checked in local preview. Key-dependent APIs have not been verified with an account.
+
+## Failed-source Hermes fallback
+
+Each scheduled run classifies partial, stale, failed and unconnected feeds, including nested price responses. Missing API keys are reported rather than counted as successes. After normal collection, Hermes investigates at most one failed SEC, awards or policy source, using at most two web retrievals. Each source/ticker has a 24-hour attempt cooldown; oldest attempted failures go first. The existing overlap investigation has its own one-per-run limit.
+
+Fallback reports must match the requested ticker, use a URL actually returned by that Hermes session, use the source's allowlisted public authority domain and have a valid non-future publication date (or no date). These checks establish provenance, not factual truth or a verified trade: all output remains labeled research leads, excluded from transactions, metrics and buyer counts. Existing leads are retained and deduplicated. Hermes cannot deploy code or access the ingest credential.
+
+Home shows source issues and agent outcomes, and warns after eight hours without a completed collector run. This is an in-app warning, not an external notification. The collector still runs on this PC; no cloud host was provisioned.
