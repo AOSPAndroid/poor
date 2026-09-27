@@ -3,10 +3,10 @@ const elements=new Map();const el=s=>{if(!elements.has(s))elements.set(s,{value:
 const context={console,Date,URL,Blob,Set,Map,JSON,crypto:require('crypto').webcrypto,setTimeout,clearTimeout,localStorage:{getItem(){return null},setItem(){}},document:{querySelector:el,querySelectorAll(){return []},addEventListener(){}}};vm.createContext(context);
 vm.runInContext(fs.readFileSync('dist/roster.js','utf8')+'\n'+fs.readFileSync('dist/data.js','utf8')+'\n'+fs.readFileSync('dist/prices.js','utf8')+'\n'+fs.readFileSync('dist/returns.js','utf8')+'\n'+fs.readFileSync('dist/clusters.js','utf8')+'\n'+fs.readFileSync('dist/track-record.js','utf8')+'\n'+fs.readFileSync('dist/portfolio.js','utf8')+'\n'+fs.readFileSync('dist/app.js','utf8'),context);
 const run=s=>vm.runInContext(s,context);
-assert.equal(run('data.length'),14);assert.ok(run('data.every(r=>rosterName(r.person))'));run('data=[...SEED]');assert.equal(run('data.length'),47);assert.equal(run('new Set(data.map(r=>r.id)).size'),47);
+assert.equal(run('data.length'),33);assert.ok(run('data.every(r=>rosterName(r.person))'));run('data=[...SEED]');assert.equal(run('data.length'),66);assert.equal(run('new Set(data.map(r=>r.id)).size'),66);
 run('data.forEach(validate)');
 assert.equal(run('lag(SEED[0])'),28);assert.equal(run('lag(SEED[2])'),24);
-assert.equal(run('parseCSV(csv(SEED)).length'),48);
+assert.equal(run('parseCSV(csv(SEED)).length'),67);
 assert.equal(run('parseCSV(csv([{...SEED[0],notes:\'comma, quote " and \\n newline\'}]))[1][13]'),'comma, quote " and \n newline');
 assert.throws(()=>run('validate({...SEED[0],source:"javascript:alert(1)"})'));
 assert.throws(()=>run('validate({...SEED[0],traded:"2026-02-30"})'));
@@ -15,7 +15,7 @@ assert.throws(()=>run('validate({...SEED[0],chamber:"unknown"})'));
 run("clear();$('#chamber').value='Senate';renderRows()");assert.equal(run('filtered().length'),5);
 run("clear();$('#search').value='Bloom Energy';renderRows()");assert.equal(run('filtered().length'),4);
 run("clear();scope='following';renderRows()");assert.equal(run('filtered().length'),0);
-run("follows.add('Nancy Pelosi');renderRows()");assert.equal(run('filtered().length'),14);
+run("follows.add('Nancy Pelosi');renderRows()");assert.equal(run('filtered().length'),33);
 assert.ok(run('esc("<script>")').includes('&lt;'));
 for(const asset of ['styles.css','app.js','data.js'])assert.ok(fs.existsSync('dist/'+asset));
 console.log('Passed: seed integrity, date/URL validation, CSV round-trip, filters, watchlist and HTML escaping.');
@@ -40,6 +40,7 @@ assert.ok(el('#detailContent').innerHTML.includes('Test Person'));
 run("$('#clusterWindow').value='7';$('#clusterWindow').onchange()");assert.equal(run('clusterDays'),7);
 run('signalData=[...SEED];data=[...SEED];clear()');assert.equal(run('clusters().length'),0);
 console.log('Passed: unique households, inclusive boundaries, non-chained windows, excluded trades, calls, import exclusion, unfeatured households, detail evidence and window control.');
+run('data=SEED.slice(0,47)'); // Bundled price snapshot covers the original recent fixtures; history loads live.
 assert.ok(run('data.filter(r=>r.type!=="Sale").every(r=>priceReturn(r)!==null)'));
 assert.ok(Math.abs(run('priceReturn(SEED[0]).pct')-56.14689965)<0.0001);
 assert.ok(run('priceCells(SEED[1])').includes('stock only'));
@@ -57,7 +58,7 @@ console.log('Passed: all purchase prices, benchmark arithmetic, option labels, m
 const liveSource=fs.readFileSync('dist/live.js','utf8');
 vm.runInContext(liveSource,context);
 run("liveFeeds.congress=[{...SEED[0],id:'feed-duplicate',quality:'Feed summary'},{...SEED[0],id:'feed-new',person:'Tom Suozzi',filed:'2026-08-22'}];rebuildLiveData()");
-assert.equal(run('data.length'),15);assert.equal(run('data.filter(r=>r.id==="feed-duplicate").length'),0);assert.equal(run('clusters().length'),1);
+assert.equal(run('data.length'),34);assert.equal(run('data.filter(r=>r.id==="feed-duplicate").length'),0);assert.equal(run('clusters().length'),1);
 run("liveStatus.congress={checkedAt:Date.now(),value:{sourceUpdatedAt:'2026-09-20',rows:[],coverage:'Limited feed'},providerStale:true};liveStatusView()");assert.ok(el('#feedStatus').innerHTML.includes('Provider data stale'));
 assert.ok(el('.snapshot').title.includes('Scheduled research status appears on Home'));
 console.log('Passed: automatic feed merge, checked-row precedence, cluster recomputation and visible freshness status.');

@@ -1,5 +1,5 @@
 const HOUR=3600000, inflight=new Map();
-const FEED_URL='https://congressinfor-production.up.railway.app/trades/recent?limit=500&offset=0&days=365';
+const FEED_URL='https://congressinfor-production.up.railway.app/trades?limit=500&offset=0';
 const CABINET_URL='https://open-cabinet.org/data/all-transactions.csv';
 const isoDate=v=>typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&!isNaN(Date.parse(v))&&new Date(v).toISOString().slice(0,10)===v;
 const symbolOK=s=>typeof s==='string'&&/^[A-Z][A-Z0-9.-]{0,11}$/.test(s);
@@ -20,14 +20,15 @@ export function congressRows(feed){
   if(validRow(r))rows.push(r);
  }
  if(feed.trades.length&&!rows.length)throw Error('Disclosure format changed');
- return {rows,provider:'CongressInvests',sourceUpdatedAt:feed.last_updated||null,providerCurrent:feed.data_current===true,available:feed.total,limited:!!feed.has_more,skipped:feed.trades.length-rows.length,coverage:'Latest 500 filings rows within 365 days; source coverage may be incomplete.'};
+ return {rows,provider:'CongressInvests',sourceUpdatedAt:feed.last_updated||null,providerCurrent:feed.data_current===true,available:feed.total,limited:!!feed.has_more,skipped:feed.trades.length-rows.length,coverage:'Historical feed; source coverage may be incomplete.'};
 }
 const rosterMembers=new Set(['Nancy Pelosi','Debbie Wasserman Schultz','Tom Suozzi','Dwight Evans','Markwayne Mullin','Ron Wyden','Susan Collins','Dan Sullivan','Rick Scott']);
 async function rosterFeed(){
  const pages=[];let offset=0;
  for(let i=0;i<10;i++){const page=await fetchJSON(FEED_URL.replace('offset=0','offset='+offset));if(!Array.isArray(page.trades)||page.cache_loading)throw Error('Disclosure feed not ready');pages.push(page);if(!page.has_more||!page.trades.length)break;offset+=page.trades.length}
  const last=pages.at(-1),normalized=congressRows({...pages[0],trades:pages.flatMap(p=>p.trades),has_more:last.has_more,data_current:pages.every(p=>p.data_current),last_updated:pages.map(p=>p.last_updated).filter(Boolean).sort()[0]});
- normalized.coverage='All available politician households; featured profiles do not limit shared-buy counts. Scanned up to 5,000 latest disclosure rows within 365 days. '+(last.has_more?'Older rows remain outside this feed.':'Reached end of available feed.');return normalized;
+ const dates=normalized.rows.map(r=>r.traded).sort();normalized.historyStart=dates[0]||null;normalized.historyEnd=dates.at(-1)||null;
+ normalized.coverage='Loaded transaction dates '+(dates[0]||'unknown')+' to '+(dates.at(-1)||'unknown')+'. All available politician households; featured profiles do not limit shared-buy counts. Scanned up to 5,000 historical rows without a one-year cutoff. Coverage is partial, not a complete trading history. '+(last.has_more?'Older rows remain outside this feed.':'Reached end of available feed.');return normalized;
 }
 async function trackedRosterFeed(env){const value=await rosterFeed(),key='poor/research/political-observations',object=await env.BUCKET.get(key),seen=object?await object.json():{},now=new Date().toISOString();for(const r of value.rows){r.firstObserved=seen[r.id]||now;seen[r.id]=r.firstObserved}await env.BUCKET.put(key,JSON.stringify(seen));return value}
 // These eight exact company labels were previously checked for poor's July records.
@@ -83,7 +84,7 @@ export function newsRows(xml){
  const items=[...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0,6).map(([,item])=>{const get=tag=>xmlText(item.match(new RegExp('<'+tag+'(?: [^>]*)?>([\\s\\S]*?)<\\/'+tag+'>'))?.[1]||'').trim();return {title:get('title').slice(0,220),url:get('link'),published:get('pubDate')}});
  return items.filter(i=>i.title&&i.url.startsWith('https://')&&!isNaN(Date.parse(i.published)));
 }
-async function pricesFor(env,symbol){return cached(env,'prices-v3/'+symbol,15*60000,async()=>chartPrices(await fetchJSON(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=2y&interval=1d`),symbol))}
+async function pricesFor(env,symbol){return cached(env,'prices-v4/'+symbol,15*60000,async()=>chartPrices(await fetchJSON(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=5y&interval=1d`),symbol))}
 const DEFAULT_WATCH=['BE','INTC','NVDA','SPY'];
 export function validateWorkspaceAction(action){
  if(!action||!['watch','rule','deleteRule','readAlerts'].includes(action.kind))throw Error('Unknown action');
@@ -133,10 +134,10 @@ async function workspace(request,env){
   if(action?.kind==='deleteRule')state.rules=state.rules.filter(r=>r.id!==action.id);
   if(action?.kind==='readAlerts')state.readAt=Date.now();
   if(state.rules.length&&(action?.kind==='rule'||Date.now()-state.evaluatedAt>60000)){
-   const feeds=await Promise.all(['congress-universe-v3'].map(async k=>{const o=await env.BUCKET.get('pif/v1/'+k);return o?await o.json():null}));
+   const feeds=await Promise.all(['congress-universe-v4'].map(async k=>{const o=await env.BUCKET.get('pif/v1/'+k);return o?await o.json():null}));
    const records=feeds.flatMap(f=>f?.value?.rows||[]);const symbols=[...new Set(state.rules.filter(r=>r.type.startsWith('price')).map(r=>r.symbol))];const prices={};
    // Use cached quotes; browser's normal update loop obtains new quotes before checking alerts.
-   for(const s of symbols){const o=await env.BUCKET.get('pif/v1/prices-v3/'+s);if(o)prices[s]=await o.json()}
+   for(const s of symbols){const o=await env.BUCKET.get('pif/v1/prices-v4/'+s);if(o)prices[s]=await o.json()}
    if(feeds.every(f=>f?.value&&!f.stale&&!f.error&&Date.now()-f.checkedAt<6*HOUR))evaluateRules(state,records,prices);else{const rules=state.rules.filter(r=>r.type.startsWith('price')),evaluated=evaluateRules({...state,rules},[],prices);state.alerts=evaluated.alerts;state.evaluatedAt=evaluated.evaluatedAt}
   }
   const saved=await env.BUCKET.put(key,JSON.stringify(state),{onlyIf:object?{etagMatches:object.etag}:{etagDoesNotMatch:'*'}});
@@ -169,7 +170,7 @@ export default {async fetch(request,env){
  if(!['GET','HEAD'].includes(request.method))return json({error:'Method not allowed'},405);
  try{
   if(url.pathname.startsWith('/api/research')){const result=await researchRoute(url,env,cached,pricesFor);return json(result,result.error?400:200)}
-  if(url.pathname==='/api/feed/congress')return json(await cached(env,'congress-universe-v3',6*HOUR,()=>trackedRosterFeed(env)));
+  if(url.pathname==='/api/feed/congress')return json(await cached(env,'congress-universe-v4',6*HOUR,()=>trackedRosterFeed(env)));
   if(url.pathname==='/api/feed/executive')return json(await cached(env,'executive',6*HOUR,async()=>{const raw=await fetchText(CABINET_URL,24000000);return executiveRows(cabinetCSV(raw.text,raw.modified))}));
   if(url.pathname==='/api/search'){
    const q=(url.searchParams.get('q')||'').trim();if(q.length<2||q.length>80||/[\x00-\x1f]/.test(q))return json({error:'Use 2–80 search characters'},400);

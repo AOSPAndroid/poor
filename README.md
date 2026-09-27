@@ -13,7 +13,7 @@ poor connects public political trading disclosures, market performance and sourc
 | **Latest political purchases** | Scan a compact feed with transaction dates, disclosure dates, reported amount ranges, ownership and links to filings. Compare stock price changes since purchase and since disclosure. |
 | **Shared political buying** | Find multiple politician households buying the same ticker within a selected time window. Counts include available feed households beyond the featured profiles and count repeated household purchases only once. |
 | **Politician profiles** | Search all loaded politicians and open a profile with short role titles, disclosed activity, track-record filters and presumed holdings. Portfolios distinguish purchases with no later disclosed sale from positions whose balance is unknown. |
-| **Track-record ratings** | See the same score on map cards, profiles, watchlists and trade views. Tap to inspect completed 20-session returns after disclosure, SPY comparisons, sample size and the scoring formula. Limited evidence stays unrated. |
+| **Track-record ratings** | See the same score on map cards, profiles, watchlists and trade views. Tap to switch between one-year and three-year histories and inspect completed 20-session returns after disclosure, S&P 500 comparisons (SPY price proxy), sample size and the scoring formula. Limited evidence stays unrated. |
 | **Trade timeline** | Scroll from newest to oldest purchases, sales and exercises on a vertical timeline with distinct colored markers, disclosure dates, amounts and available stock price changes. Open the politician’s research map directly from the profile. |
 | **Expandable detective map** | Put a politician in the center, unfold their purchases and sales, inspect the latest buy/sell dates, open a stock to discover other traders, then explore those buyers’ activity. Inspect dates, amounts, price changes and original sources on one pannable, zoomable sheet. |
 | **Stock research map** | Use the same labeled search controls, map-type buttons, zoom controls and rounded cards as the politician view, with the stock at the center. Connect political activity, corporate insider transactions, government awards, policy candidates, market context and research theses. Evidence and hypotheses are labeled separately. |
@@ -47,7 +47,7 @@ Article scorecards use a separate, later entry convention: the first available c
 
 ## Track-record score
 
-The score uses stock/ADR purchases from the past year, deduplicated by politician, ticker and purchase date. Entry is the first SPY closing session after disclosure; exit is 20 sessions later. Every closing price in the stock’s window must be present. Options, ETFs, sales, exercises and user imports are excluded.
+The card score uses stock/ADR purchases from the past year; the evidence dialog also offers a separate past-three-years calculation, deduplicated by politician, ticker and purchase date. Entry is the first SPY closing session after disclosure; exit is 20 sessions later. Every closing price in the stock’s window must be present. Options, ETFs, sales, exercises and user imports are excluded.
 
 Raw score = 60% × clamp(50 + 5 × median excess return in percentage points, 0, 100) + 40% × percentage of scored purchases beating SPY. The final value is pulled toward 50 using sample weight n / (n + 10). Rating requires at least 5 completed buys, 2 stocks, 3 purchase dates and 80% price coverage of mature windows. Strong starts at 65, Positive at 55, Mixed at 45, and Weak is below 45.
 
@@ -77,3 +77,9 @@ node verify-politicians.mjs
 node verify-ratings.mjs
 node verify-company-search.mjs
 ```
+
+### Historical coverage
+
+The automatic congressional feed now requests the full paginated history, capped at 5,000 rows per refresh, rather than only the last 365 days. Sources reports the loaded date range, rejected rows and whether more rows remain. This is partial provider coverage, not a complete archive. Price histories request five years and the terminal includes a 5Y range. No language-model calls are used for feed retrieval or return calculations.
+
+A verified Pelosi backfill adds 19 stock, option, sale and exercise records from six House PTRs spanning November 2023–June 2025. Each links to its original report. Exercises stay distinct from fresh buys; option prices and returns are not inferred from their underlying shares. Historical disclosure dates use report signatures where original posting timestamps are unavailable, so copy-return estimates can be optimistic. The badge stays on one year; selecting three years never silently changes every politician’s score.

@@ -9,7 +9,7 @@ const number=n=>Number.isFinite(n)?new Intl.NumberFormat('en-US',{notation:'comp
 function stockRecords(symbol=marketSymbol){const today=new Date().toISOString().slice(0,10);return signalData.filter(r=>r.ticker===symbol&&r.quality!=='User-provided'&&r.traded<=today&&disclosedDate(r)&&disclosedDate(r)<=today).sort((a,b)=>(disclosedDate(b)||b.filed).localeCompare(disclosedDate(a)||a.filed))}
 function chartPoints(p,range){
  const entries=Object.entries({...p?.closes,...(p?.asOf&&p?.latest?{[p.asOf]:p.latest}:{})}).filter(([d,v])=>validDate(d)&&Number.isFinite(v)&&v>0).sort((a,b)=>a[0].localeCompare(b[0]));if(!entries.length)return [];
- const days=({'1M':30,'3M':90,'6M':183,'1Y':366,'2Y':732})[range]||183,cutoff=Date.parse(entries.at(-1)[0])-days*86400000;
+ const days=({'1M':30,'3M':90,'6M':183,'1Y':366,'2Y':732,'5Y':1827})[range]||183,cutoff=Date.parse(entries.at(-1)[0])-days*86400000;
  return entries.filter(([d])=>Date.parse(d)>=cutoff);
 }
 function benchmarkSeries(points,benchmark){if(!points.length)return [];const first=points.find(([d])=>benchmark?.closes?.[d]>0);if(!first)return [];const base=benchmark.closes[first[0]];return points.filter(([d])=>benchmark.closes[d]>0).map(([d])=>[d,benchmark.closes[d]/base*first[1]])}

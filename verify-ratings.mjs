@@ -20,4 +20,7 @@ assert.ok(rate(records,{SPY:price(2),AAA:price(),BBB:price(),CCC:price()}).score
 assert.equal(rate(records,{SPY:price(),AAA:price(),BBB:price(),CCC:price()}).median,0);
 const gap=structuredClone(prices);delete gap.AAA.closes[days[2]];assert.ok(rate(records,gap).missing>0,'Missing entry is never silently shifted to a later close');
 assert.equal(rate(records,{...prices,SPY:undefined}).score,null,'No benchmark means no rating');
+const later=now+400*86400000;
+assert.equal(ctx.calculate('Test',records,prices,later).n,0,'One-year score excludes older buys');
+assert.equal(ctx.calculate('Test',records,prices,later,1095).n,9,'Three-year view includes older completed windows without changing the default');
 console.log('Passed: next-session entry, matched 20-session windows, evidence thresholds, exclusions, dedupe, incomplete coverage and score direction.');

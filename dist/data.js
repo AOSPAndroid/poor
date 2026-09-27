@@ -65,3 +65,32 @@ add('Bryan Steil','House','R','WI','Not specified','2019-07-22','https://disclos
 ['MRK','Merck','Sale','Stock','2019-07-12','$1,001–$15,000'],
 ['USB','U.S. Bancorp','Sale','Stock','2019-07-12','$1,001–$15,000']]);
 SEED.filter(r=>r.person==='Bryan Steil').forEach(r=>r.notes='Historical amended filing: July 12, 2019 trade date replaces July 22 in original report 20012039. JPMorgan brokerage account; owner column blank. Ticker as reported. These are not recent trades.');
+
+// Historical backfill read from the linked House PTRs. Dates use report signature;
+// original public-posting timestamps are not available, so copy returns are estimates.
+function historicalPelosi(year,id,filed,items){const start=SEED.length;add('Nancy Pelosi','House','D','CA','Spouse',filed,`https://disclosures-clerk.house.gov/public_disc/ptr-pdfs/${year}/${id}.pdf`,'Official filing',items);SEED.slice(start).forEach(r=>{r.notes+=' Historical backfill: disclosure date uses the signed report; original public-posting time is unverified. Contract terms are as filed, before subsequent splits.'})}
+historicalPelosi(2023,'20024186','2023-12-21',[
+ ['NVDA','NVIDIA','Purchase','Call options','2023-11-22','$1,000,001–$5,000,000','50 calls; $120 strike; expires December 20, 2024.']]);
+historicalPelosi(2024,'20024542','2024-02-23',[
+ ['PANW','Palo Alto Networks','Purchase','Call options','2024-02-12','$500,001–$1,000,000','50 calls; $200 strike; expires January 17, 2025.'],
+ ['PANW','Palo Alto Networks','Purchase','Call options','2024-02-21','$100,001–$250,000','20 calls; $200 strike; expires January 17, 2025.']]);
+historicalPelosi(2024,'20025368','2024-07-02',[
+ ['AVGO','Broadcom','Purchase','Call options','2024-06-24','$1,000,001–$5,000,000','20 calls; $800 strike; expires June 20, 2025.'],
+ ['NVDA','NVIDIA','Purchase','Stock','2024-06-26','$1,000,001–$5,000,000','10,000 shares purchased.'],
+ ['TSLA','Tesla','Sale','Stock','2024-06-24','$250,001–$500,000','2,500 shares sold.'],
+ ['V','Visa','Sale','Stock','2024-07-01','$500,001–$1,000,000','Partial sale of 2,000 shares.']]);
+historicalPelosi(2024,'20025535','2024-07-30',[
+ ['MSFT','Microsoft','Sale','Stock','2024-07-26','$1,000,001–$5,000,000','Partial sale of 5,000 shares.'],
+ ['NVDA','NVIDIA','Purchase','Stock','2024-07-26','$1,000,001–$5,000,000','10,000 shares purchased.']]);
+historicalPelosi(2025,'20026590','2025-01-17',[
+ ['GOOGL','Alphabet','Purchase','Call options','2025-01-14','$250,001–$500,000','50 calls; $150 strike; expires January 16, 2026.'],
+ ['AMZN','Amazon','Purchase','Call options','2025-01-14','$250,001–$500,000','50 calls; $150 strike; expires January 16, 2026.'],
+ ['AAPL','Apple','Sale','Stock','2024-12-31','$5,000,001–$25,000,000','Partial sale of 31,600 shares.'],
+ ['NVDA','NVIDIA','Sale','Stock','2024-12-31','$1,000,001–$5,000,000','Partial sale of 10,000 shares.'],
+ ['NVDA','NVIDIA','Exercise','Stock','2024-12-20','$500,001–$1,000,000','500 calls exercised into 50,000 shares at $12. Original options purchased November 22, 2023.'],
+ ['NVDA','NVIDIA','Purchase','Call options','2025-01-14','$250,001–$500,000','50 calls; $80 strike; expires January 16, 2026.'],
+ ['PANW','Palo Alto Networks','Exercise','Stock','2024-12-20','$1,000,001–$5,000,000','140 calls exercised into 14,000 shares at $100.'],
+ ['TEM','Tempus AI','Purchase','Call options','2025-01-14','$50,001–$100,000','50 calls; $20 strike; expires January 16, 2026.'],
+ ['VST','Vistra','Purchase','Call options','2025-01-14','$500,001–$1,000,000','50 calls; $50 strike; expires January 16, 2026.']]);
+historicalPelosi(2025,'20030630','2025-07-09',[
+ ['AVGO','Broadcom','Exercise','Stock','2025-06-20','$1,000,001–$5,000,000','200 calls exercised into 20,000 shares at $80. Original options purchased June 24, 2024.']]);
