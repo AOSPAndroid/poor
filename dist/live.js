@@ -1,6 +1,6 @@
 'use strict';
 const liveFeeds={},liveStatus={},priceChecks=new Map();let liveBusy=false,priceBusy=false;
-const stamp=t=>t?new Date(t).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'never';
+const stamp=t=>{if(!t)return 'never';const d=new Date(t);if(isNaN(d))return '—';const pad=n=>String(n).padStart(2,'0'),iso=d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());return date(iso)+' · '+pad(d.getHours())+':'+pad(d.getMinutes())};
 function sourceGroup(r){let source;try{source=decodeURIComponent(r.source).toLowerCase()}catch{source=r.source}return [source,r.person.toLowerCase(),r.ticker,r.traded].join('|')}
 function rebuildLiveData(){
  const seedGroups=new Set(SEED.map(sourceGroup)),seen=new Set();
@@ -15,7 +15,7 @@ function liveStatusView(){
  const checked=[...priceChecks.values()],good=checked.filter(x=>!x.error),failed=checked.length-good.length;
  const total=new Set(data.filter(r=>r.type!=='Sale'&&/^[A-Z][A-Z0-9.-]{0,11}$/.test(r.ticker)).map(r=>r.ticker)).size;
  $('.price-note').textContent=`Prices ${good.length}/${total} checked${priceBusy?' · Updating…':failed?' · '+failed+' unavailable':''} · dates per row`;
- $('#feedStatus').innerHTML=sources.map(([name,s])=>`<p><strong>${name==='congress'?'CongressInvests':'Trump · Open Cabinet'}</strong> · ${s.error?'Update failed; saved data':s.providerStale?'Provider data stale':s.stale?'Saved data':'Connected'}<br>Last success: ${esc(stamp(s.checkedAt))} · Provider updated: ${esc(stamp(s.value?.sourceUpdatedAt))}<br>${esc(s.value?.coverage||'Using selected historical records.')} ${s.value?`${s.value.rows.length} loaded; ${s.value.skipped||0} unsupported rows omitted.`:''}</p>`).join('')+`<p>Prices: ${good.length}/${total} symbols checked this session${failed?`; ${failed} unavailable`:''}. Each row shows its latest completed closing date. If a refresh fails, older prices remain labeled with their actual dates.</p>`;
+ $('#feedStatus').innerHTML=sources.map(([name,s])=>`<p><strong>${name==='congress'?'CongressInvests':'Trump · Open Cabinet'}</strong> · ${s.error?'Update failed; saved data':s.providerStale?'Provider data stale':s.stale?'Saved data':'Connected'}<br>Last success: ${esc(stamp(s.checkedAt))} · Provider updated: ${esc(stamp(s.value?.sourceUpdatedAt))}<br>${esc(dateText(s.value?.coverage||'Using selected historical records.'))} ${s.value?`${s.value.rows.length} loaded; ${s.value.skipped||0} unsupported rows omitted.`:''}</p>`).join('')+`<p>Prices: ${good.length}/${total} symbols checked this session${failed?`; ${failed} unavailable`:''}. Each row shows its latest completed closing date. If a refresh fails, older prices remain labeled with their actual dates.</p>`;
 }
 async function getLiveJSON(url){const r=await fetch(url,{cache:'no-store',signal:AbortSignal.timeout(60000)});if(!r.ok)throw Error('Update unavailable');return r.json()}
 async function refreshPrices(){

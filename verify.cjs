@@ -75,7 +75,7 @@ assert.equal(run("transactionLabel({type:'Exercise'})"),'Exercised on');
 run("PRICES.TEST={latest:150,asOf:'2026-09-25',currency:'USD',source:'https://finance.yahoo.com/quote/TEST/history/',closes:{'2026-07-01':100,'2026-07-15':125}};");
 assert.equal(run("disclosureReturn({...SEED[0],ticker:'TEST',traded:'2026-07-01',filed:'2026-07-15'}).pct"),19.999999999999996);
 assert.equal(run("disclosureReturn({...SEED[0],ticker:'TEST',traded:'2026-07-01',filed:'2026-07-16'})"),null);
-run("details(SEED.find(r=>r.person==='Donald Trump').id)");assert.ok(el('#detailContent').innerHTML.includes('Report signed'));assert.ok(el('#detailContent').innerHTML.includes('Sep 22, 2026'));
+run("details(SEED.find(r=>r.person==='Donald Trump').id)");assert.ok(el('#detailContent').innerHTML.includes('Report signed'));assert.ok(el('#detailContent').innerHTML.includes('22-09-2026'));
 console.log('Passed: labeled dates, publication vs signature, disclosure gaps, company names and disclosure-day price calculations.');
 const trackFixture=[{person:'A',ticker:'T',type:'Purchase',asset:'Stock',traded:'2026-09-01',filed:'2026-09-02',chamber:'House',source:'https://example.com'}, {person:'A',ticker:'LOSS',type:'Purchase',asset:'ETF',traded:'2026-09-01',filed:'2026-09-02',chamber:'House',source:'https://example.com'}];
 const trackPrices={T:{latest:120,asOf:'2026-09-25',closes:{'2026-09-01':100,'2026-09-02':110}},LOSS:{latest:80,asOf:'2026-09-25',closes:{'2026-09-01':100,'2026-09-02':100}}};

@@ -12,7 +12,15 @@ const pageSize=20;
 function notify(message){$('#toast').textContent=message;$('#toast').classList.add('visible');clearTimeout(notify.timer);notify.timer=setTimeout(()=>$('#toast').classList.remove('visible'),3000)}
 function persist(key,value){try{localStorage.setItem(key,JSON.stringify(value));return true}catch{notify('Browser storage is unavailable. Changes last only for this session.');return false}}
 const lag=r=>Math.round((Date.parse(r.filed)-Date.parse(r.traded))/86400000);
-const date=s=>new Date(s+'T00:00:00Z').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',timeZone:'UTC'});
+// Display-only dates: keep ISO values for sorting, calculations, CSV and attributes.
+function date(s,now=new Date()){
+ if(!s)return '—';const iso=String(s).slice(0,10);if(!validDate(iso))return '—';
+ const today=Date.UTC(now.getFullYear(),now.getMonth(),now.getDate()),delta=Math.round((today-Date.parse(iso+'T00:00:00Z'))/86400000),days=Math.abs(delta);
+ const age=days===0?'today':days<7?days+'d':days<30?Math.floor(days/7)+'wk':days<365?Math.floor(days/30)+'mo':Math.floor(days/365)+'yr';
+ return iso.slice(8,10)+'-'+iso.slice(5,7)+'-'+iso.slice(0,4)+' ('+(delta<0?'in ':'')+age+')';
+}
+function dateText(s){return String(s??'').replace(/\b\d{4}-\d{2}-\d{2}\b/g,x=>date(x));}
+
 const initials=s=>s.split(' ').map(x=>x[0]).slice(0,2).join('');
 function filtered(){clusters();const q=$('#search').value.trim().toLowerCase();return data.filter(r=>(!q||(q.startsWith('$')?r.ticker.toLowerCase()===q.slice(1):[r.person,r.company,r.ticker,r.owner].some(x=>x.toLowerCase().includes(q))))&&(!$('#chamber').value||r.chamber===$('#chamber').value)&&(!$('#type').value||($('#type').value==='Buys'?r.type==='Purchase'||r.type==='Exercise':r.type===$('#type').value))&&(scope!=='following'||follows.has(r.person))&&(scope!=='clusters'||clusterByRow.has(r.id))).sort((a,b)=>$('#sort').value==='disclosed'?(disclosedDate(b)||'').localeCompare(disclosedDate(a)||'')||b.traded.localeCompare(a.traded):$('#sort').value==='upside'?(priceReturn(b)?.pct??-Infinity)-(priceReturn(a)?.pct??-Infinity)||b.traded.localeCompare(a.traded):b.traded.localeCompare(a.traded)||b.filed.localeCompare(a.filed));}
 function renderStats(){const delays=data.map(disclosureDelay).filter(x=>x!==null).sort((a,b)=>a-b),mid=Math.floor(delays.length/2),median=delays.length%2?delays[mid]:(delays[mid-1]+delays[mid])/2;const values=[['trades',data.length],['politicians',new Set(data.map(r=>r.person)).size],['assets',new Set(data.map(r=>r.ticker)).size],['median disclosure gap',(delays.length?median+'d':'—')]];$('#stats').innerHTML=values.map(a=>`<span class="stat"><strong>${a[1]}</strong> ${a[0]}</span>`).join('');const counts={};data.filter(r=>r.type!=='Sale').forEach(r=>counts[r.ticker]=(counts[r.ticker]||0)+1);const ranked=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,4),max=ranked[0]?.[1]||1;$('#activity').innerHTML=ranked.map(([t,n])=>`<div class="bar-row"><span>${esc(t)}</span><div class="bar-track"><i style="width:${n/max*100}%"></i></div><b>${n}</b></div>`).join('');}
