@@ -29,7 +29,7 @@ async function refreshPrices(){
     priceChecks.set(ticker,{checkedAt:result?.checkedAt,error:!valid||!!result.error||!!result.stale});
    }
   }catch{for(const ticker of batch)priceChecks.set(ticker,{error:true})}
-  renderRows();renderPeople();if(typeof renderHome==='function')renderHome();liveStatusView();
+  if(typeof refreshRatingBadges==='function')refreshRatingBadges();renderRows();renderPeople();if(typeof renderHome==='function')renderHome();liveStatusView();
  }
  priceBusy=false;liveStatusView();if(typeof renderPeopleMap==='function'&&view==='map'&&mapMode==='people')renderPeopleMap();if(typeof renderTerminal==='function'){await loadMarketPrices([...workspaceState.symbols,...workspaceState.rules.map(r=>r.symbol),marketSymbol,'SPY']);renderPeople();renderTerminal();await workspaceAction()}
 }

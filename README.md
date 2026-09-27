@@ -13,6 +13,7 @@ poor connects public political trading disclosures, market performance and sourc
 | **Latest political purchases** | Scan a compact feed with transaction dates, disclosure dates, reported amount ranges, ownership and links to filings. Compare stock price changes since purchase and since disclosure. |
 | **Shared political buying** | Find multiple politician households buying the same ticker within a selected time window. Counts include available feed households beyond the featured profiles and count repeated household purchases only once. |
 | **Politician profiles** | Search all loaded politicians and open a profile with short role titles, disclosed activity, track-record filters and presumed holdings. Portfolios distinguish purchases with no later disclosed sale from positions whose balance is unknown. |
+| **Track-record ratings** | See the same score on map cards, profiles, watchlists and trade views. Tap to inspect completed 20-session returns after disclosure, SPY comparisons, sample size and the scoring formula. Limited evidence stays unrated. |
 | **Trade timeline** | Scroll from newest to oldest purchases, sales and exercises on a vertical timeline with distinct colored markers, disclosure dates, amounts and available stock price changes. Open the politician’s research map directly from the profile. |
 | **Expandable detective map** | Put a politician in the center, unfold their purchases and sales, inspect the latest buy/sell dates, open a stock to discover other traders, then explore those buyers’ activity. Inspect dates, amounts, price changes and original sources on one pannable, zoomable sheet. |
 | **Stock research map** | Connect political activity, corporate insider transactions, government awards, policy candidates, market context and research theses. Evidence and hypotheses are labeled separately. |
@@ -44,6 +45,14 @@ Trade and disclosure returns are hypothetical **stock price changes**, not verif
 
 Article scorecards use a separate, later entry convention: the first available close strictly after publication day. Calculations exclude dividends, fees, taxes and execution effects. Presumed holdings are inferred from loaded disclosures; quantities, current position values and undisclosed sales are unknown.
 
+## Track-record score
+
+The score uses stock/ADR purchases from the past year, deduplicated by politician, ticker and purchase date. Entry is the first SPY closing session after disclosure; exit is 20 sessions later. Every closing price in the stock’s window must be present. Options, ETFs, sales, exercises and user imports are excluded.
+
+Raw score = 60% × clamp(50 + 5 × median excess return in percentage points, 0, 100) + 40% × percentage of scored purchases beating SPY. The final value is pulled toward 50 using sample weight n / (n + 10). Rating requires at least 5 completed buys, 2 stocks, 3 purchase dates and 80% price coverage of mature windows. Strong starts at 65, Positive at 55, Mixed at 45, and Weak is below 45.
+
+These are descriptive product thresholds, not a validated prediction or probability of profit. The detail panel shows evidence and coverage. Overlapping trades are not independent; incomplete disclosures can bias results. Ratings are computed automatically without model calls and do not change with display filters.
+
 ## Local development
 
 Build the site and start the preview from the repository root:
@@ -65,4 +74,5 @@ node verify-research.mjs
 node verify-connections.mjs
 node verify-people-map.mjs
 node verify-politicians.mjs
+node verify-ratings.mjs
 ```

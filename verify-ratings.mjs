@@ -1,0 +1,23 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
+const ctx=vm.createContext({Date,console});
+vm.runInContext(fs.readFileSync('dist/track-record.js','utf8')+'\n'+fs.readFileSync('dist/ratings.js','utf8')+'\nfunction disclosedDate(r){return r.filed}\nglobalThis.calculate=calculatePoliticianRating;',ctx);
+const days=[];for(let t=Date.parse('2026-01-02');days.length<65;t+=86400000){const d=new Date(t);if(d.getUTCDay()!==0&&d.getUTCDay()!==6)days.push(d.toISOString().slice(0,10))}
+const price=(step=0)=>({asOf:days.at(-1),closes:Object.fromEntries(days.map((d,i)=>[d,100+i*step]))});
+const records=Array.from({length:9},(_,i)=>({person:'Test',ticker:['AAA','BBB','CCC'][i%3],type:'Purchase',asset:'Stock',traded:days[Math.floor(i/3)],filed:days[Math.floor(i/3)+1],source:'https://example.com/filing'}));
+const prices={SPY:price(),AAA:price(2),BBB:price(2),CCC:price(2)},now=Date.parse(days.at(-1)+'T23:00:00Z');
+const rate=(rows=records,p=prices)=>ctx.calculate('Test',rows,p,now);
+let r=rate();assert.equal(r.n,9);assert.ok(r.score>60&&r.score<=100);assert.equal(r.samples[0].entry,days[2]);assert.equal(r.samples[0].end,days[22]);
+assert.equal(rate([...records,records[0]]).n,9,'Duplicate ownership rows cannot inflate sample size');
+assert.equal(rate(records.slice(0,4)).score,null,'Four samples cannot be rated');
+assert.equal(rate(records.map(r=>({...r,type:'Sale'}))).n,0);
+assert.equal(rate(records.map(r=>({...r,asset:'Call options'}))).n,0);
+assert.equal(rate(records.map(r=>({...r,quality:'User-provided'}))).n,0);
+assert.equal(rate(records.map(r=>({...r,filed:'2099-01-01'}))).n,0);
+assert.equal(rate(records,{...prices,CCC:{}}).score,null,'Incomplete histories with under 80% mature coverage remain unrated');
+assert.ok(rate(records,{SPY:price(2),AAA:price(),BBB:price(),CCC:price()}).score<45,'Consistent underperformance earns a weak score');
+assert.equal(rate(records,{SPY:price(),AAA:price(),BBB:price(),CCC:price()}).median,0);
+const gap=structuredClone(prices);delete gap.AAA.closes[days[2]];assert.ok(rate(records,gap).missing>0,'Missing entry is never silently shifted to a later close');
+assert.equal(rate(records,{...prices,SPY:undefined}).score,null,'No benchmark means no rating');
+console.log('Passed: next-session entry, matched 20-session windows, evidence thresholds, exclusions, dedupe, incomplete coverage and score direction.');
