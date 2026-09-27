@@ -1,0 +1,24 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
+const ctx=vm.createContext({console,Date});
+vm.runInContext(fs.readFileSync('dist/returns.js','utf8')+`
+const PRICES={ABC:{closes:{'2026-01-02':100,'2026-01-05':110,'2026-01-06':120},latest:120,asOf:'2026-01-06',currency:'USD'}};
+const esc=s=>String(s??'').replaceAll('<','&lt;').replaceAll('"','&quot;');
+const date=s=>s;
+const ROSTER={};
+const base={person:'Test Person',ticker:'ABC',company:'<script>',type:'Purchase',asset:'Stock',owner:'Self',amount:'$1,001–$15,000',source:'https://example.com/filing',traded:'2026-01-02',filed:'2026-01-05',id:'buy'};
+const signalData=[base,{...base,id:'sell',type:'Sale',traded:'2026-01-05'}, {...base,id:'future',filed:'2099-01-01'}, {...base,id:'import',quality:'User-provided'}];
+function followerReturn(r){return {pct:0,basisDate:'2026-01-06'}};
+`+fs.readFileSync('dist/politicians.js','utf8').split("document.addEventListener('click'")[0],ctx);
+const run=s=>vm.runInContext(s,ctx);
+assert.equal(run("politicianRecords('Test Person').map(r=>r.id).join(',')"),'sell,buy');
+assert.equal(run("politicianNames().join(',')"),'Test Person');
+assert.match(run('timelineReturn(signalData[1])'),/Stock since sale.*\+9\.1%/);
+assert.match(run('timelineReturn(signalData[1])'),/Realized profit unknown/);
+assert.match(run('timelineReturn(base)'),/Since disclosure.*\+0\.0%/);
+assert.match(run('timelineReturn(base)'),/Disclosure entry 2026-01-06/);
+assert.doesNotMatch(run("politicianTimeline(politicianRecords('Test Person'))"),/<script>/);
+assert.match(run("politicianTimeline([])"),/No dated public transactions/);
+assert.match(run("timelineReturn({...base,ticker:'MISSING'})"),/Comparable price unavailable/);
+console.log('Passed: timeline chronology, future/import exclusion, unfeatured names, sale price comparison, disclosure entry, missing prices and escaping.');

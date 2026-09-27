@@ -12,7 +12,8 @@ poor connects public political trading disclosures, market performance and sourc
 | --- | --- |
 | **Latest political purchases** | Scan a compact feed with transaction dates, disclosure dates, reported amount ranges, ownership and links to filings. Compare stock price changes since purchase and since disclosure. |
 | **Shared political buying** | Find multiple politician households buying the same ticker within a selected time window. Counts include available feed households beyond the featured profiles and count repeated household purchases only once. |
-| **Politician profiles** | See short role titles, disclosed activity, track-record filters and presumed holdings. Portfolios distinguish purchases with no later disclosed sale from positions whose balance is unknown. |
+| **Politician profiles** | Search all loaded politicians and open a profile with short role titles, disclosed activity, track-record filters and presumed holdings. Portfolios distinguish purchases with no later disclosed sale from positions whose balance is unknown. |
+| **Trade timeline** | Scroll from newest to oldest purchases, sales and exercises on a vertical timeline with distinct colored markers, disclosure dates, amounts and available stock price changes. Open the politician’s research map directly from the profile. |
 | **Expandable detective map** | Put a politician in the center, unfold their purchases, open a stock to discover other buyers, then explore those buyers’ activity. Inspect dates, amounts, price changes and original sources on one pannable, zoomable sheet. |
 | **Stock research map** | Connect political activity, corporate insider transactions, government awards, policy candidates, market context and research theses. Evidence and hypotheses are labeled separately. |
 | **Market terminal** | Explore stock and ETF charts with touch interaction, political purchase and disclosure markers, and an optional SPY comparison. |
@@ -63,4 +64,5 @@ node verify-terminal.mjs
 node verify-research.mjs
 node verify-connections.mjs
 node verify-people-map.mjs
+node verify-politicians.mjs
 ```
