@@ -156,3 +156,11 @@ run("followerPrices.COPY.latest=100");assert.equal(run('followerReturn(followerR
 assert.ok(fs.readFileSync('dist/index.html','utf8').includes('>Since disclosure</th>'));
 run('renderHome()');assert.ok(el('#homePurchases').innerHTML.includes('home-disclosure-return'));
 console.log('Passed: follower return excludes disclosure-day gains, handles missing trade-day history, market closures, missing next close, options, losses and zero return.');
+el('#stockChart').clientWidth=360;
+run("showBuyMarkers=true;showDisclosureMarkers=true;marketSymbol='BE';renderStockChart()");
+assert.ok(el('#stockChart').innerHTML.includes('viewBox="0 0 360 300"'));
+assert.ok(el('#stockChart').innerHTML.includes('class="marker-hit"'));assert.ok(el('#stockChart').innerHTML.includes('r="22"'));
+assert.ok(el('#stockChart').innerHTML.includes('disclosure-marker'));assert.ok(el('#chartActivity').innerHTML.includes('Nancy Pelosi'));
+assert.ok(el('#chartActivity').innerHTML.includes('Disclosed'));assert.ok(el('#chartActivity').innerHTML.includes('Bought'));
+run("eventDetails('2026-08-21','disclosed')");assert.ok(el('#detailContent').innerHTML.includes('Since disclosure:'));
+console.log('Passed: mobile-sized SVG, large hit targets, distinct disclosure markers, activity returns and tap detail returns.');
