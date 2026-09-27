@@ -34,3 +34,5 @@ tr .price-then{grid-column:1!important;grid-row:5!important}tr .price-now{grid-c
 tr .return-cell{grid-column:1!important;grid-row:6!important;text-align:left}tr .public-return{grid-column:2!important;grid-row:6!important}
 .mobile-label{display:block;font-size:12px;color:#536560;font-weight:500}.public-return small{font-size:12px}.field-label{font-size:12px}.table-scroll .empty{grid-column:1/-1}
 }
+
+.politician-role{display:block;font-size:12px;line-height:1.4;font-weight:500;color:#52685c;margin:3px 0}.person-card>.politician-role{font-size:14px}.people-card>.politician-role{font-size:12px;margin:2px 0 5px}.people-root .people-root-copy{margin:4px 0}.people-root .people-shortcuts{max-height:68px;overflow:auto}.people-card:has(>.politician-role) .people-sub{margin-bottom:5px}
