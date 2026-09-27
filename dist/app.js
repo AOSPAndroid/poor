@@ -6,6 +6,7 @@ function read(key,fallback){try{return JSON.parse(localStorage.getItem(key))??fa
 let imported=read('cl-imports',[]);if(!Array.isArray(imported))imported=[];
 imported=imported.filter(r=>{try{validate(r);return true}catch{return false}}).map(r=>({...r,quality:'User-provided'}));
 const savedFollows=read('cl-follows',[]); let follows=new Set((Array.isArray(savedFollows)?savedFollows:[]).filter(x=>typeof x==='string'));
+let signalData=SEED.filter(r=>r.quality!=='User-provided');
 let data=selectedRecords([...SEED,...imported]),view='home',scope='all',page=1;
 const pageSize=20;
 function notify(message){$('#toast').textContent=message;$('#toast').classList.add('visible');clearTimeout(notify.timer);notify.timer=setTimeout(()=>$('#toast').classList.remove('visible'),3000)}

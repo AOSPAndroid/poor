@@ -15,7 +15,7 @@ function followerReturn(r,prices=PRICES){
  return {pct:(p.latest/p.closes[entry]-1)*100,then:p.closes[entry],basisDate:entry,asOf:p.asOf,stale:!!p.stale,underlying:r.asset==='Call options'};
 }
 function followerCell(r){const p=followerReturn(r);return `<td class="home-disclosure-return ${p?(p.pct>=0?'gain':'loss'):'muted'}" title="${p?esc('Entry close '+date(p.basisDate)+'; latest close '+date(p.asOf)):'No completed closing price after disclosure available'}">${p?percent(p):'—'}<small>${p?'From '+date(p.basisDate)+(p.underlying?' · stock only':'')+(p.stale?' · stale':''):'Awaiting price / date'}</small></td>`}
-function renderHome(){
+function renderHome(){renderSharedBuying();
  if(!$('#homeView'))return;if(typeof renderContext==='function')renderContext();
  $('#homePurchases').innerHTML=latestPurchases().map(r=>`<tr><td><button class="home-person" data-person="${esc(r.person)}">${esc(r.person)}</button>${politicianRole(r.person)}<small>${esc(r.owner)}</small></td><td><button class="home-ticker" data-ticker="${esc(r.ticker)}">${esc(r.ticker)}</button><small>${esc(r.asset)}</small></td><td>${date(r.traded)}</td><td>${disclosedDate(r)?date(disclosedDate(r)):'Unknown'}</td><td>${esc(r.amount)}</td><td class="${(priceReturn(r)?.pct||0)>=0?'gain':'loss'}">${priceReturn(r)?percent(priceReturn(r)):'—'}${r.asset==='Call options'?'<small>stock only</small>':''}</td>${followerCell(r)}<td><button class="row-details" data-detail="${esc(r.id)}" aria-label="Details for ${esc(r.person)} ${esc(r.ticker)} purchase">↗</button></td></tr>`).join('')||'<tr><td colspan="8">No purchases in the loaded disclosures.</td></tr>';
  $('#homeETFs').innerHTML=HOME_ETFS.map(quoteCard).join('');$('#homeStocks').innerHTML=HOME_STOCKS.map(quoteCard).join('');

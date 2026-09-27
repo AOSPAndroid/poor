@@ -5,7 +5,8 @@ function sourceGroup(r){let source;try{source=decodeURIComponent(r.source).toLow
 function rebuildLiveData(){
  const seedGroups=new Set(SEED.map(sourceGroup)),seen=new Set();
  const feedRows=Object.values(liveFeeds).flat().filter(r=>!seedGroups.has(sourceGroup(r)));
- data=selectedRecords([...SEED,...feedRows,...imported]).filter(r=>{if(seen.has(r.id))return false;seen.add(r.id);return true});render();
+ signalData=[...SEED,...feedRows].filter(r=>r.quality!=='User-provided').filter((r,i,rows)=>rows.findIndex(x=>x.id===r.id)===i);
+ data=selectedRecords([...SEED,...feedRows,...imported]).filter(r=>{if(seen.has(r.id))return false;seen.add(r.id);return true});render();if(typeof renderPeopleMap==='function'&&view==='map'&&mapMode==='people')renderPeopleMap();
 }
 function liveStatusView(){
  const sources=Object.entries(liveStatus),fail=sources.some(([,v])=>v.stale||v.error||v.providerStale);

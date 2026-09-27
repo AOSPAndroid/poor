@@ -21,7 +21,7 @@ for(const asset of ['styles.css','app.js','data.js'])assert.ok(fs.existsSync('di
 console.log('Passed: seed integrity, date/URL validation, CSV round-trip, filters, watchlist and HTML escaping.');
 
 run("clear();$('#chamber').value='Executive';renderRows()");assert.equal(run('filtered().length'),8);assert.equal(run('new Set(data.map(r=>r.person)).size'),8);assert.ok(run("card('Nancy Pelosi')").includes('2 / 2 years'));assert.ok(run("card('Donald Trump')").includes('Executive'));run("details(data.find(r=>r.person==='Donald Trump').id)");assert.ok(el('#detailContent').innerHTML.includes('Open Cabinet'));assert.ok(!el('#detailContent').innerHTML.includes('Coldpine'));
-const fixture=(person,traded,extra={})=>({id:person+traded,person,traded,ticker:'TEST',asset:'Stock',type:'Purchase',...extra});
+const fixture=(person,traded,extra={})=>({id:person+traded,person,traded,filed:traded,ticker:'TEST',asset:'Stock',type:'Purchase',...extra});
 context.testRows=[fixture('A','2026-01-01'),fixture('A','2026-01-02',{owner:'Spouse'}),fixture('B','2026-01-31')];
 assert.equal(run('buyingClusters(testRows,30)[0].count'),2);
 assert.equal(run('buyingClusters(testRows.slice(0,2),30).length'),0);
@@ -32,13 +32,14 @@ context.testRows=[fixture('A','2026-01-01'),fixture('B','2026-02-01')];assert.eq
 context.testRows=[fixture('A','2026-01-01'),fixture('B','2026-01-01',{type:'Sale'}),fixture('C','2026-01-01',{type:'Exercise'}),fixture('D','2026-01-01',{asset:'ETF'})];assert.equal(run('buyingClusters(testRows,30).length'),0);
 context.testRows=[fixture('A','2026-01-01'),fixture('B','2026-01-01',{asset:'Call options',ticker:'test'})];assert.equal(run('buyingClusters(testRows,7)[0].count'),2);
 assert.equal(run('buyingClusters(SEED,30).length'),0);
-run("data=[...SEED,{...SEED[0],id:'test-import',person:'Test Person',quality:'User-provided'}];clear();scope='clusters';renderRows()");
-assert.equal(run('filtered().length'),5);assert.ok(el('#rows').innerHTML.includes('2 buyers'));
-run('clusterDetails(0)');assert.ok(el('#detailContent').innerHTML.includes('User-provided'));
+assert.equal(run("buyingClusters([...SEED,{...SEED[0],id:'test-import',person:'Test Person',quality:'User-provided'}],30).length"),0);
+run("signalData=[...SEED,{...SEED[0],id:'test-other',person:'Test Person',quality:'Feed summary'}];data=selectedRecords(signalData);clear();scope='clusters';renderRows()");
+assert.equal(run('filtered().length'),4);assert.ok(el('#rows').innerHTML.includes('2 buyers'));
+run('clusterDetails(0)');assert.ok(el('#detailContent').innerHTML.includes('Feed summary'));
 assert.ok(el('#detailContent').innerHTML.includes('Test Person'));
 run("$('#clusterWindow').value='7';$('#clusterWindow').onchange()");assert.equal(run('clusterDays'),7);
-run('data=[...SEED];clear()');assert.equal(run('clusters().length'),0);
-console.log('Passed: unique households, inclusive boundaries, non-chained windows, excluded trades, calls, import flags, detail evidence and window control.');
+run('signalData=[...SEED];data=[...SEED];clear()');assert.equal(run('clusters().length'),0);
+console.log('Passed: unique households, inclusive boundaries, non-chained windows, excluded trades, calls, import exclusion, unfeatured households, detail evidence and window control.');
 assert.ok(run('data.filter(r=>r.type!=="Sale").every(r=>priceReturn(r)!==null)'));
 assert.ok(Math.abs(run('priceReturn(SEED[0]).pct')-56.14689965)<0.0001);
 assert.ok(run('priceCells(SEED[1])').includes('stock only'));
@@ -86,7 +87,7 @@ run("trackSettings.min=0;trackSettings.gain=0;renderPeople()");assert.ok(run("ra
 console.log('Passed: track-record dedupe, missing coverage, option exclusions, equal weighting, return bases, win rate, time window and gain filtering.');
 vm.runInContext(fs.readFileSync('dist/terminal.js','utf8'),context);
 for(const selector of ['#chartCrosshair','#chartFocus'])el(selector).setAttribute=()=>{};
-run("data=selectedRecords(SEED);PRICES.BE.closes=Object.fromEntries(['2026-07-20','2026-07-21','2026-07-22','2026-07-23','2026-07-24','2026-07-27','2026-07-28','2026-07-29','2026-07-30','2026-08-21'].map((d,i)=>[d,100+i]));renderStockChart()");
+run("signalData=[...SEED];data=selectedRecords(SEED);PRICES.BE.closes=Object.fromEntries(['2026-07-20','2026-07-21','2026-07-22','2026-07-23','2026-07-24','2026-07-27','2026-07-28','2026-07-29','2026-07-30','2026-08-21'].map((d,i)=>[d,100+i]));renderStockChart()");
 assert.equal((el('#stockChart').innerHTML.match(/data-event-mode="traded"/g)||[]).length,2);
 run("setChartOption('buys',false);setChartOption('disclosures',true)");
 assert.ok(!el('#stockChart').innerHTML.includes('data-event-mode="traded"'));

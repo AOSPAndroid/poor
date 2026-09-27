@@ -6,7 +6,7 @@ const marketNews=new Map();let plottedPoints=[],chartGeometry=null,inspectedDate
 const tickerValid=s=>/^[A-Z][A-Z0-9.-]{0,11}$/.test(s);
 const signed=n=>(n>=0?'+':'')+n.toFixed(2)+'%';
 const number=n=>Number.isFinite(n)?new Intl.NumberFormat('en-US',{notation:'compact',maximumFractionDigits:1}).format(n):'—';
-function stockRecords(symbol=marketSymbol){return data.filter(r=>r.ticker===symbol).sort((a,b)=>(disclosedDate(b)||b.filed).localeCompare(disclosedDate(a)||a.filed))}
+function stockRecords(symbol=marketSymbol){return signalData.filter(r=>r.ticker===symbol).sort((a,b)=>(disclosedDate(b)||b.filed).localeCompare(disclosedDate(a)||a.filed))}
 function chartPoints(p,range){
  const entries=Object.entries({...p?.closes,...(p?.asOf&&p?.latest?{[p.asOf]:p.latest}:{})}).filter(([d,v])=>validDate(d)&&Number.isFinite(v)&&v>0).sort((a,b)=>a[0].localeCompare(b[0]));if(!entries.length)return [];
  const days=({'1M':30,'3M':90,'6M':183,'1Y':366,'2Y':732})[range]||183,cutoff=Date.parse(entries.at(-1)[0])-days*86400000;

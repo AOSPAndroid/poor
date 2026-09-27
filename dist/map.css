@@ -9,3 +9,5 @@
 .people-shortcuts{display:flex;flex-wrap:wrap;justify-content:center;gap:5px;margin:3px 0}.people-shortcuts button{font-size:12px;padding:5px 8px;background:#fff;border:1px solid #c9dbd0;border-radius:5px;min-height:30px}.people-card .people-meta{line-height:1.35}.people-card .people-amount{margin:9px 0}.people-actions{bottom:12px}.people-returns{margin-top:10px}
 
 .people-name{font:inherit;color:inherit;text-align:left;line-height:inherit;padding:0;cursor:pointer}.people-name:hover{text-decoration:underline}.people-coverage{border-style:dashed;background:#fafcfb}.people-coverage p{font-size:14px;line-height:1.5}.people-coverage .people-meta{font-size:12px}.people-threads path.people-coverage-thread{stroke:#88988e;stroke-dasharray:5 5}
+
+.map-buy-count{display:block;font-size:11px;color:#426d55;margin:0 0 5px}.people-stock .people-sub{margin-bottom:3px}.people-stock .people-amount{margin:5px 0}.people-stock .people-returns{margin-top:4px}
