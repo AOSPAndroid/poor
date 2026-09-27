@@ -10,7 +10,8 @@ poor connects public political trading disclosures, market performance and sourc
 
 | Feature | What you can do |
 | --- | --- |
-| **Latest political purchases** | Scan a compact feed with transaction dates, disclosure dates, reported amount ranges, ownership and links to filings. Compare stock price changes since purchase and since disclosure. |
+| **Decision-focused Home** | Start with changes since the previous visit, up to three qualified research setups, and separate developing leads with missing-evidence labels. Cards connect public positioning to dated catalysts, confirmation, invalidation, price movement, sources, maps and watchlists. An empty qualified list stays empty. |
+| **Latest political purchases** | Sorted by disclosure date across loaded households. Scan a compact feed with transaction dates, disclosure dates, reported amount ranges, ownership and links to filings. Compare stock price changes since purchase and since disclosure. |
 | **Shared political buying** | Find multiple politician households buying the same ticker within a selected time window. Counts include available feed households beyond the featured profiles and count repeated household purchases only once. |
 | **Politician profiles** | Search all loaded politicians and open a profile with short role titles, disclosed activity, track-record filters and presumed holdings. Portfolios distinguish purchases with no later disclosed sale from positions whose balance is unknown. |
 | **Track-record ratings** | See the same score on map cards, profiles, watchlists and trade views. Tap to switch between one-year and three-year histories and inspect completed 20-session returns after disclosure, S&P 500 comparisons (SPY price proxy), sample size and the scoring formula. Limited evidence stays unrated. |
@@ -38,6 +39,8 @@ The research system combines structured feeds with bounded agent investigations.
 - Political disclosures combine curated records with the available congressional feed and links to original filings. Coverage is incomplete, including some scanned filings.
 - Market charts and return calculations use dated price histories. The interface exposes missing or stale data rather than inventing values.
 - Research adapters cover SEC insider filings, USAspending awards, Federal Register policy candidates and Treasury yields. Congress.gov bill data and Alpha Vantage earnings calendars require server-side keys. Congress.gov is connected on the public deployment; earnings dates remain unavailable until an Alpha Vantage key is configured. Keys are never included in this repository.
+- Home ranking, change detection, returns and market context use deterministic calculations, with no model calls. Research priority is not a win probability. Qualified cards require a recent sourced catalyst, a published thesis, current prices, sufficient estimated stock turnover and no adverse follow-up verdict. Option-related performance refers to the underlying stock.
+- Daily research checks at most eight cached stock maps and sends up to four candidate connections to the existing bounded investigation. Older purchases rotate through the scan. An unchanged candidate fingerprint skips the daily model call; explicit refresh can override this. This is partial monitoring, not exhaustive market surveillance.
 - Scheduled collection runs every six hours; daily research is scheduled once per day. The current scheduler requires the configured computer to be awake and its user signed in. Routine updates do not require an open coding session or browser.
 - Alerts are delivered inside poor. Email and push delivery are not connected.
 
