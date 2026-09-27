@@ -83,3 +83,13 @@ node verify-company-search.mjs
 The automatic congressional feed now requests the full paginated history, capped at 5,000 rows per refresh, rather than only the last 365 days. Sources reports the loaded date range, rejected rows and whether more rows remain. This is partial provider coverage, not a complete archive. Price histories request five years and the terminal includes a 5Y range. No language-model calls are used for feed retrieval or return calculations.
 
 A verified Pelosi backfill adds 19 stock, option, sale and exercise records from six House PTRs spanning November 2023–June 2025. Each links to its original report. Exercises stay distinct from fresh buys; option prices and returns are not inferred from their underlying shares. Historical disclosure dates use report signatures where original posting timestamps are unavailable, so copy-return estimates can be optimistic. The badge stays on one year; selecting three years never silently changes every politician’s score.
+
+### Navigation and keyboard shortcuts
+
+- The related-pages bar retains the current stock and selected politician across chart, map, trades, evidence, research, and profile views.
+- `Ctrl/Cmd+K` searches stocks, companies, politicians, pages, and visible controls. `/` opens search; `?` opens the shortcut guide.
+- Press `G`, then `H` (Home), `T` (Terminal), `D` (Trades), `P` (Politicians), `W` (Watchlist), `A` (Alerts), `M` (contextual map), `R` (Research), or `S` (Sources).
+- `Ctrl+M` opens the contextual map. In the terminal, `W` watches/unwatches and `A` opens the alert form.
+- In the terminal, `X` then `B/S/D/N/A/I/P` controls buys, sales, disclosures, names, activity, benchmark, or price-only mode.
+- Letter shortcuts ignore typing fields, open dialogs, repeated keys, and input composition. `Esc` cancels a pending key sequence.
+- Research reached from a stock is filtered to that ticker, with a visible **Show all research** control. Empty filtered results do not imply missing stock evidence.
