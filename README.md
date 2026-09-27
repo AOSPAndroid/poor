@@ -16,13 +16,13 @@ poor connects public political trading disclosures, market performance and sourc
 | **Track-record ratings** | See the same score on map cards, profiles, watchlists and trade views. Tap to inspect completed 20-session returns after disclosure, SPY comparisons, sample size and the scoring formula. Limited evidence stays unrated. |
 | **Trade timeline** | Scroll from newest to oldest purchases, sales and exercises on a vertical timeline with distinct colored markers, disclosure dates, amounts and available stock price changes. Open the politician’s research map directly from the profile. |
 | **Expandable detective map** | Put a politician in the center, unfold their purchases and sales, inspect the latest buy/sell dates, open a stock to discover other traders, then explore those buyers’ activity. Inspect dates, amounts, price changes and original sources on one pannable, zoomable sheet. |
-| **Stock research map** | Connect political activity, corporate insider transactions, government awards, policy candidates, market context and research theses. Evidence and hypotheses are labeled separately. |
+| **Stock research map** | Use the same labeled search controls, map-type buttons, zoom controls and rounded cards as the politician view, with the stock at the center. Connect political activity, corporate insider transactions, government awards, policy candidates, market context and research theses. Evidence and hypotheses are labeled separately. |
 | **Market terminal** | Explore stock and ETF charts with touch interaction, political purchase, sale and disclosure markers. Toggle buys, sales, disclosures, names/returns, SPY and activity details independently, or use Price only. |
 | **Swing-trade context** | Monitor bond and credit ETF proxies, Treasury yields and market moves alongside stock research. Use available catalyst data and a position-sizing tool. |
 | **poor’s research** | Read concise, cited theses linking multiple facts: why a stock matters now, what could confirm the thesis, what could invalidate it and the relevant trading horizon. Follow-up reviews can challenge earlier conclusions. |
 | **Research performance** | Inspect hypothetical stock price changes after article publication, with available 5-, 20- and 60-session results, SPY comparisons and drawdown. Entry uses the first available daily close strictly after publication day. |
 | **Watchlists and alerts** | Save stocks and configure in-app alerts for disclosures, buying clusters and daily closing-price thresholds. |
-| **Command palette** | Press **Ctrl/Cmd + K** to find pages, tickers, politicians and chart commands, including choosing the central politician for the map. |
+| **Command palette** | Press **Ctrl/Cmd + K** to find pages, company names, tickers, politicians and chart commands, including choosing the central politician for the map. Company suggestions include ticker and exchange, with cached lookups and local fallback. |
 | **Import and export** | Export transactions to CSV or load checked transactions locally. User imports are labeled and excluded from shared-buying signals. |
 
 ## Connecting the dots
@@ -75,4 +75,5 @@ node verify-connections.mjs
 node verify-people-map.mjs
 node verify-politicians.mjs
 node verify-ratings.mjs
+node verify-company-search.mjs
 ```

@@ -1,0 +1,14 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
+const ctx=vm.createContext({console});
+vm.runInContext(`const data=[],signalData=[],ROSTER={},PRICES={};const showBuyMarkers=true,showSaleMarkers=true,showChartLabels=true,showChartActivity=true,showDisclosureMarkers=true,showBenchmark=true;function tickerValid(s){return /^[A-Z][A-Z0-9.-]{0,11}$/.test(s)};function politicianTitle(){return ''};`+fs.readFileSync('dist/commands.js','utf8'),ctx);
+const run=s=>vm.runInContext(s,ctx);
+assert.equal(run("paletteResults('alcoa').some(r=>r.key==='ALCOA')"),false,'A company name is not an invented ticker');
+run("companySearchCache.set('alcoa',[{symbol:'AA',name:'Alcoa Corporation',exchange:'NYSE',type:'EQUITY'}])");
+assert.equal(run("paletteResults('alcoa')[0].key"),'AA');
+assert.match(run("paletteResults('alcoa')[0].detail"),/NYSE/);
+assert.equal(run("paletteResults('$ZZZZ').at(-1).key"),'ZZZZ','Explicit ticker lookup remains available');
+assert.equal(run("paletteResults('apple',[{ticker:'AAPL',company:'Apple Inc.'}])[0].key"),'AAPL','Known company names work without a network request');
+assert.equal(run("paletteResults('alcoa').filter(r=>r.key==='AA').length"),1);
+console.log('Passed: company-to-ticker lookup, exchange labels, local fallback, explicit symbols and deduplication.');

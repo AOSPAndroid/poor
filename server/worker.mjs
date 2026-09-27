@@ -171,6 +171,10 @@ export default {async fetch(request,env){
   if(url.pathname.startsWith('/api/research')){const result=await researchRoute(url,env,cached,pricesFor);return json(result,result.error?400:200)}
   if(url.pathname==='/api/feed/congress')return json(await cached(env,'congress-universe-v3',6*HOUR,()=>trackedRosterFeed(env)));
   if(url.pathname==='/api/feed/executive')return json(await cached(env,'executive',6*HOUR,async()=>{const raw=await fetchText(CABINET_URL,24000000);return executiveRows(cabinetCSV(raw.text,raw.modified))}));
+  if(url.pathname==='/api/search'){
+   const q=(url.searchParams.get('q')||'').trim();if(q.length<2||q.length>80||/[\x00-\x1f]/.test(q))return json({error:'Use 2–80 search characters'},400);
+   return json(await cached(env,'company-search/'+encodeURIComponent(q.toLowerCase()),24*HOUR,async()=>{const raw=await fetchJSON('https://query1.finance.yahoo.com/v1/finance/search?q='+encodeURIComponent(q)+'&quotesCount=10&newsCount=0',1000000);return {quotes:(raw.quotes||[]).filter(x=>['EQUITY','ETF'].includes(x.quoteType)&&symbolOK(x.symbol)&&typeof (x.shortname||x.longname)==='string').slice(0,10).map(x=>({symbol:x.symbol,name:(x.longname||x.shortname).slice(0,160),exchange:String(x.exchDisp||x.exchange||'').slice(0,40),type:x.quoteType})),source:'Yahoo Finance search'}}));
+  }
   if(url.pathname==='/api/news'){
    const symbol=url.searchParams.get('symbol');if(!symbolOK(symbol))return json({error:'Invalid ticker'},400);
    return json(await cached(env,'news/'+symbol,HOUR,async()=>({items:newsRows((await fetchText(`https://feeds.finance.yahoo.com/rss/2.0/headline?s=${encodeURIComponent(symbol)}&region=US&lang=en-US`,1000000)).text),source:'Yahoo Finance RSS'})));
