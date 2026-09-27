@@ -1,11 +1,12 @@
 'use strict';
-const PAGE_KEYS={h:['home','Home'],t:['market','Terminal'],d:['trades','Political trades'],p:['politicians','Politicians'],w:['watchlist','Watchlist'],a:['alerts','Alerts'],m:['map','Research map'],r:['daily','poor’s research'],s:['sources','Sources']};
+const PAGE_KEYS={c:['chat','Ask poor'],h:['home','Home'],t:['market','Terminal'],d:['trades','Political trades'],p:['politicians','Politicians'],w:['watchlist','Watchlist'],a:['alerts','Alerts'],m:['map','Research map'],r:['daily','poor’s research'],s:['sources','Sources']};
 const LAYER_KEYS={b:['buys','Buy markers'],s:['sales','Sale markers'],d:['disclosures','Disclosures'],n:['labels','Names & returns'],a:['activity','Activity details'],i:['benchmark','S&P 500'],p:['priceOnly','Price only']};
 let shortcutPrefix='',shortcutTimer,visibleCommandItems=[];
 function contextStock(){return view==='map'&&mapMode==='stock'?mapTicker:marketSymbol}
 function contextPerson(){return view==='map'&&mapMode==='people'?peopleRoot:selectedPolitician}
 function goConnected(action){
  const symbol=contextStock(),person=contextPerson();
+ if(action==='chat'){changeView('chat');$('#chatSymbol').value=symbol;return}
  if(action==='chart')return openStock(symbol);
  if(action==='stock-map')return openResearchMap(symbol);
  if(action==='person-map')return person?openPeopleMap(person):openPeopleMap();
@@ -18,9 +19,9 @@ function goConnected(action){
 }
 function renderConnections(){
  const el=$('#connectionBar');if(!el)return;
- el.hidden=view==='home';if(el.hidden){el.innerHTML='';return}
+ el.hidden=view==='home'||view==='chat';if(el.hidden){el.innerHTML='';return}
  const symbol=contextStock(),person=contextPerson(),button=(action,label)=>`<button data-connect="${action}">${label}</button>`;
- el.innerHTML=`<span class="connection-stock"><b>${esc(symbol)}</b>${button('chart','Chart')}${button('stock-map','Map')}${button('stock-trades','Trades')}${button('evidence','Evidence')}${button('briefs','Research')}</span>${person?`<span class="connection-person"><b>${esc(person)}</b>${button('profile','Profile & timeline')}${button('person-map','Map')}${button('person-trades','Trades')}</span>`:''}<button class="shortcut-help" data-connect="help" title="Keyboard shortcuts (?)">Shortcuts <kbd>?</kbd></button>`;
+ el.innerHTML=`<span class="connection-stock"><b>${esc(symbol)}</b>${button('chart','Chart')}${button('stock-map','Map')}${button('stock-trades','Trades')}${button('evidence','Evidence')}${button('briefs','Research')}${button('chat','Ask poor')}</span>${person?`<span class="connection-person"><b>${esc(person)}</b>${button('profile','Profile & timeline')}${button('person-map','Map')}${button('person-trades','Trades')}</span>`:''}<button class="shortcut-help" data-connect="help" title="Keyboard shortcuts (?)">Shortcuts <kbd>?</kbd></button>`;
 }
 function showShortcutHelp(){
  if(document.querySelector('dialog[open]'))return;
