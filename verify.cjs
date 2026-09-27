@@ -156,7 +156,8 @@ assert.equal(run("followerReturn({...followerRow,asset:'Call options'},followerP
 run("followerPrices.COPY.latest=90");assert.ok(run('followerReturn(followerRow,followerPrices).pct')<0);
 run("followerPrices.COPY.latest=100");assert.equal(run('followerReturn(followerRow,followerPrices).pct'),0);
 assert.ok(fs.readFileSync('dist/index.html','utf8').includes('>Since disclosure</th>'));
-run('renderHome()');assert.ok(el('#homePurchases').innerHTML.includes('home-disclosure-return'));
+assert.ok(run('followerCell(followerRow)').includes('home-disclosure-return'));
+run('renderHome()');assert.ok(el('#homePurchases').innerHTML.includes('No recent moves'));
 console.log('Passed: follower return excludes disclosure-day gains, handles missing trade-day history, market closures, missing next close, options, losses and zero return.');
 el('#stockChart').clientWidth=360;
 run("showBuyMarkers=true;showDisclosureMarkers=true;marketSymbol='BE';renderStockChart()");
