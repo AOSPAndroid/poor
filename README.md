@@ -16,13 +16,15 @@ poor connects public political trading disclosures, market performance and sourc
 | **Track-record ratings** | See the same score on map cards, profiles, watchlists and trade views. Tap to switch between one-year and three-year histories and inspect completed 20-session returns after disclosure, S&P 500 comparisons (SPY price proxy), sample size and the scoring formula. Limited evidence stays unrated. |
 | **Trade timeline** | Scroll from newest to oldest purchases, sales and exercises on a vertical timeline with distinct colored markers, disclosure dates, amounts and available stock price changes. Open the politician’s research map directly from the profile. |
 | **Expandable detective map** | Put a politician in the center, unfold their purchases and sales, inspect the latest buy/sell dates, open a stock to discover other traders, then explore those buyers’ activity. Inspect dates, amounts, price changes and original sources on one pannable, zoomable sheet. |
-| **Stock research map** | Use the same labeled search controls, map-type buttons, zoom controls and rounded cards as the politician view, with the stock at the center. Connect political activity, corporate insider transactions, government awards, policy candidates, market context and research theses. Evidence and hypotheses are labeled separately. |
+| **Stock research map** | Use the same labeled search controls, map-type buttons, zoom controls and rounded cards as the politician view, with the stock at the center. Connect political activity, corporate insider transactions, government awards, policy candidates, market context and research theses. Evidence and hypotheses are labeled separately. The central stock card includes a one-month mini chart, latest closing price, percentage change and price date, with green gains and red declines. |
 | **Market terminal** | Explore stock and ETF charts with touch interaction, political purchase, sale and disclosure markers. Toggle buys, sales, disclosures, names/returns, SPY and activity details independently, or use Price only. |
 | **Swing-trade context** | Monitor bond and credit ETF proxies, Treasury yields and market moves alongside stock research. Use available catalyst data and a position-sizing tool. |
 | **poor’s research** | Read concise, cited theses linking multiple facts: why a stock matters now, what could confirm the thesis, what could invalidate it and the relevant trading horizon. Follow-up reviews can challenge earlier conclusions. |
 | **Research performance** | Inspect hypothetical stock price changes after article publication, with available 5-, 20- and 60-session results, SPY comparisons and drawdown. Entry uses the first available daily close strictly after publication day. |
 | **Watchlists and alerts** | Save stocks and configure in-app alerts for disclosures, buying clusters and daily closing-price thresholds. |
 | **Command palette** | Press **Ctrl/Cmd + K** to find pages, company names, tickers, politicians and chart commands, including choosing the central politician for the map. Company suggestions include ticker and exchange, with cached lookups and local fallback. |
+| **Connected navigation** | Keep the current stock and politician in a compact related-pages bar. Move between chart, map, trades, evidence, research, profiles and timelines without repeating a search. Transaction and map inspectors link directly to related pages. |
+| **Phone and iPad layouts** | Use compact navigation, a More menu for account/import/export, larger touch controls and scrollable data tables. The chart appears higher on phones; tablet layouts retain more columns. |
 | **Import and export** | Export transactions to CSV or load checked transactions locally. User imports are labeled and excluded from shared-buying signals. |
 
 ## Connecting the dots
@@ -35,13 +37,13 @@ The research system combines structured feeds with bounded agent investigations.
 
 - Political disclosures combine curated records with the available congressional feed and links to original filings. Coverage is incomplete, including some scanned filings.
 - Market charts and return calculations use dated price histories. The interface exposes missing or stale data rather than inventing values.
-- Research adapters cover SEC insider filings, USAspending awards, Federal Register policy candidates and Treasury yields. Congress.gov bill data and Alpha Vantage earnings calendars require optional keys and are currently unconnected.
+- Research adapters cover SEC insider filings, USAspending awards, Federal Register policy candidates and Treasury yields. Congress.gov bill data and Alpha Vantage earnings calendars require server-side keys. Congress.gov is connected on the public deployment; earnings dates remain unavailable until an Alpha Vantage key is configured. Keys are never included in this repository.
 - Scheduled collection runs every six hours; daily research is scheduled once per day. The current scheduler requires the configured computer to be awake and its user signed in. Routine updates do not require an open coding session or browser.
 - Alerts are delivered inside poor. Email and push delivery are not connected.
 
 ## Reading the numbers
 
-Trade and disclosure returns are hypothetical **stock price changes**, not verified politician profits. They use the relevant day’s available close; the disclosure-day close does not establish that the filing was public before that close. Missing dates or prices produce an unavailable value. Options display the underlying stock’s change, not the option’s return.
+Trade and disclosure returns are hypothetical **stock price changes**, not verified politician profits. Since-purchase comparisons use available historical stock closes. The latest-purchases feed’s since-disclosure return uses the first available close strictly after the disclosure date. This is a daily-close convention, not an actual execution price. Missing dates or prices produce an unavailable value. Options display the underlying stock’s change, not the option’s return.
 
 Article scorecards use a separate, later entry convention: the first available close strictly after publication day. Calculations exclude dividends, fees, taxes and execution effects. Presumed holdings are inferred from loaded disclosures; quantities, current position values and undisclosed sales are unknown.
 
