@@ -1,0 +1,40 @@
+/* Keep dense information inside its panel, not wider than the device. */
+.app-utilities{display:flex;align-items:center;gap:10px}#utilityToggle{display:none}
+main>section,.terminal-grid>*,.terminal-center>*,.politician-detail-layout>*,.sources-grid>*,.people-grid>*{min-width:0}
+.home-table-wrap,.research-table-wrap,.stock-table-wrap,.table-scroll{max-width:100%;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
+dialog{max-width:calc(100vw - 24px);max-height:calc(100dvh - 32px);overflow:auto;box-sizing:border-box}
+@media(max-width:1180px){
+ .appbar{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;padding:6px 12px}
+ .appbar .brand{grid-column:1;grid-row:1}.app-actions{grid-column:2;grid-row:1;justify-self:end;margin:0;min-width:0;position:relative}
+ .appbar nav{grid-column:1/-1;grid-row:2;display:flex;width:100%;min-width:0;overflow-x:auto;justify-content:flex-start;gap:3px;scrollbar-width:thin}
+ .appbar .nav{flex:none;min-height:40px;padding:7px 10px;font-size:13px}
+ #utilityToggle{display:block;min-height:40px;padding:6px 10px;border:1px solid #d6dfda;border-radius:5px;background:white;font-size:13px;white-space:nowrap}
+ .app-utilities{display:none;position:absolute;right:0;top:calc(100% + 8px);min-width:210px;padding:10px;border:1px solid #d6dfda;border-radius:8px;background:white;box-shadow:0 8px 30px #18342825;z-index:100}
+ .utilities-open .app-utilities{display:grid;gap:8px}.app-utilities button,.app-utilities a{display:block;min-height:40px;padding:10px;text-align:left;box-sizing:border-box}
+ .command-trigger{min-height:40px;padding:6px 10px}.connection-bar{gap:4px 12px}.connection-bar button{min-height:36px}
+ .stock-actions button,.range-buttons button,.board-jumps button,.board-zoom button{min-height:40px}
+ .chart-switches label{min-height:40px}.map-controls button,.map-mode-tabs button{min-height:44px}
+ .politician-detail-layout{grid-template-columns:minmax(245px,.8fr) minmax(0,1.2fr);gap:10px}
+ .research-heading{flex-wrap:wrap}.research-heading select{max-width:100%}
+ .map-canvas,.map-canvas:has(.people-world){height:clamp(420px,60dvh,720px)}
+}
+@media(min-width:701px) and (max-width:1000px){
+ .terminal-grid{grid-template-columns:140px minmax(0,1fr);gap:8px}.stock-heading{flex-wrap:wrap}.stock-actions{justify-content:flex-start}
+ .stock-name>span{max-width:280px}.stock-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}.stock-metrics strong{white-space:normal}
+ .terminal-news #stockNews{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:700px){
+ main{padding:0 8px 12px}.appbar{padding:5px 8px;gap:3px 8px}.appbar .brand{font-size:22px}.app-actions{gap:6px}.command-trigger span{display:inline}.command-trigger kbd{display:none}
+ .connection-bar{display:flex;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin;padding:5px 0;gap:12px}.connection-bar>span{flex:none;flex-wrap:nowrap;width:auto}.connection-bar button{white-space:nowrap;min-height:38px}.connection-bar b{white-space:nowrap}.connection-bar .shortcut-help{flex:none;margin-left:0}
+ .overview{flex-wrap:wrap;gap:3px;padding:4px 0;min-height:0}.market-mode #stats{display:none}.stats{gap:4px 10px}.snapshot{white-space:normal;font-size:11px}
+ .terminal-grid{grid-template-columns:minmax(0,1fr)}.terminal-watch{grid-template-columns:120px minmax(0,1fr)}.terminal-watch>.pane-title{display:none}.workspace-status{font-size:10px;padding:2px 8px}#tickerSearch{padding:6px;align-items:center}#tickerInput{font-size:16px;min-height:40px}#stockWatchlist{min-width:0;scrollbar-width:thin}.watch-row{min-width:100px;padding:7px;font-size:12px}.watch-row small{font-size:10px}
+ .terminal-center{display:flex;flex-direction:column}.terminal-center>*{order:4}.terminal-center>.stock-overview{order:0}.terminal-center>.chart-panel{order:1}.terminal-center>.swing-panel{order:2}
+ .stock-overview{padding:10px}.stock-heading{gap:6px}.stock-name{flex-wrap:wrap;gap:4px 8px}.stock-name>span{overflow-wrap:anywhere}.stock-actions{gap:6px}.stock-actions button{min-height:40px;padding:7px 10px}.quote-line{flex-wrap:wrap;gap:5px 10px}.quote-line>strong{font-size:28px}.quote-line>span{font-size:12px}.stock-metrics{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.stock-metrics strong{white-space:normal}
+ .chart-toolbar{gap:5px}.range-buttons{display:flex;width:100%;justify-content:space-between}.range-buttons button{flex:1;min-height:40px;font-size:13px}.chart-switches{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 10px;width:100%}.chart-switches label{font-size:12px;min-height:40px;gap:6px}.chart-switches input{flex-shrink:0;width:34px;height:20px}.chart-switches input:after{width:14px;height:14px;top:3px;left:3px}.chart-switches input:checked:after{left:17px}#chartScrub{height:26px;margin:3px 0}.chart-readout{line-height:1.5}.chart-caption{gap:4px;line-height:1.4}.chart-activity-row{grid-template-columns:minmax(0,1.2fr) 1fr 1fr}
+ .terminal-news #stockNews{grid-template-columns:1fr}.swing-heading{flex-wrap:wrap}.swing-panel select,.research-heading select{font-size:16px;min-height:40px}.research-heading{gap:6px}.research-heading h2{width:100%}.research-heading select{flex:1;min-width:0}.research-table{min-width:680px}.research-table thead{display:table-header-group}.research-table tbody{display:table-row-group}.research-table tr{display:table-row}.research-table td{display:table-cell;font-size:12px;padding:8px;vertical-align:top}.research-table td:before{content:none!important}
+ .politician-detail-layout{grid-template-columns:minmax(0,1fr)}.politician-searchbar{flex-wrap:wrap}.politician-searchbar label{width:100%}.politician-searchbar input{min-width:0}.profile-actions{flex-wrap:wrap;gap:8px}.timeline-scroll{max-height:65dvh}.timeline-links{flex-wrap:wrap;gap:8px}.timeline-links button,.timeline-links a{min-height:36px;display:inline-flex;align-items:center}
+ .map-heading{padding:7px 0}.map-heading h1{font-size:19px}.map-controls{padding:8px}.map-control-main,.map-control-secondary{gap:6px}.map-control-secondary{margin-top:8px;padding-top:7px}.map-controls .board-zoom{justify-content:flex-start;flex-wrap:wrap}.board-zoom button{min-width:40px;min-height:40px}.map-position-switches{gap:4px 12px;padding:5px 0}.map-position-switches label{min-height:40px;font-size:12px}.map-position-switches small{font-size:11px}.map-canvas,.map-canvas:has(.people-world){height:clamp(360px,60dvh,560px)}.board-jumps{flex-wrap:nowrap;overflow-x:auto;max-width:100%;scrollbar-width:thin}.board-jumps button{flex:none}.board-footer{flex-wrap:wrap}.board-hint{line-height:1.4}
+ .toolbar{flex-wrap:wrap}.toolbar input,.toolbar select,input:not([type=checkbox]):not([type=radio]):not([type=range]),select{font-size:16px}.toolbar .tabs{max-width:100%;overflow:auto}.sources-grid,.people-grid{grid-template-columns:minmax(0,1fr)}.source-card,.daily-article{overflow-wrap:anywhere}.home-heading{flex-wrap:wrap;gap:5px}.home-favorites{min-width:0;flex-wrap:wrap}.quote-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ dialog{padding:16px;max-height:calc(100dvh - 24px)}#commandPalette{margin:16px auto;max-height:calc(100dvh - 32px)}#commandResults{max-height:60dvh}.command-option{min-height:44px}.command-option>span{min-width:0}.command-option strong{overflow-wrap:anywhere}.close{min-width:40px;min-height:40px}.detail-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.detail-grid strong{overflow-wrap:anywhere}.detail-connections{gap:6px}.detail-connections button{white-space:normal;min-height:40px}
+}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}

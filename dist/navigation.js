@@ -60,3 +60,11 @@ if(typeof window!=='undefined'){
  for(const [key,[page,label]]of Object.entries(PAGE_KEYS))for(const el of document.querySelectorAll(`.nav[data-view="${page}"]`))el.title=label+' (G then '+key.toUpperCase()+')';
  renderConnections();renderDailyFilter();
 }
+
+if(typeof window!=='undefined'){
+ const toggle=$('#utilityToggle');
+ function closeUtilities(){document.querySelector('.appbar').classList.remove('utilities-open');toggle.setAttribute('aria-expanded','false')}
+ toggle.onclick=()=>{const on=toggle.getAttribute('aria-expanded')!=='true';document.querySelector('.appbar').classList.toggle('utilities-open',on);toggle.setAttribute('aria-expanded',String(on))};
+ document.addEventListener('click',e=>{if(!e.target.closest('.app-actions')||e.target.closest('#exportButton,#importButton'))closeUtilities()});
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&toggle.getAttribute('aria-expanded')==='true'){closeUtilities();toggle.focus()}});
+}
