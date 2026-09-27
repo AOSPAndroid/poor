@@ -168,7 +168,7 @@ export default {async fetch(request,env){
  if(url.pathname==='/api/workspace'&&['GET','POST'].includes(request.method)){try{return await workspace(request,env)}catch(error){console.error('Workspace failure',error.message);return json({error:'Workspace temporarily unavailable'},503)}}
  if(!['GET','HEAD'].includes(request.method))return json({error:'Method not allowed'},405);
  try{
-  if(url.pathname.startsWith('/api/research')){const result=await researchRoute(url,env,cached);return json(result,result.error?400:200)}
+  if(url.pathname.startsWith('/api/research')){const result=await researchRoute(url,env,cached,pricesFor);return json(result,result.error?400:200)}
   if(url.pathname==='/api/feed/congress')return json(await cached(env,'congress-roster-v2',6*HOUR,()=>trackedRosterFeed(env)));
   if(url.pathname==='/api/feed/executive')return json(await cached(env,'executive',6*HOUR,async()=>{const raw=await fetchText(CABINET_URL,24000000);return executiveRows(cabinetCSV(raw.text,raw.modified))}));
   if(url.pathname==='/api/news'){

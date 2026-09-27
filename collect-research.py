@@ -25,7 +25,7 @@ def collect_awards(symbol,base,token):
         for row in result['results']:
             row['awardKind']='Contract' if types[0]=='A' else 'Grant';rows.append(row)
     request(base,'/api/research/ingest',{'kind':'awards','symbol':symbol,'rows':rows},token)
-def cited_urls(session,initial):
+def cited_urls(session,initial,profile=None):
     """Only let links from actual tool results or the supplied filings reach the public app."""
     urls=set(initial)
     def walk(value):
@@ -37,7 +37,7 @@ def cited_urls(session,initial):
         elif isinstance(value,list):
             for v in value:walk(v)
     if not session:return urls
-    with sqlite3.connect('file:'+str(PROFILE/'state.db').replace('\\','/')+'?mode=ro',uri=True) as c:
+    with sqlite3.connect('file:'+str((profile or PROFILE)/'state.db').replace('\\','/')+'?mode=ro',uri=True) as c:
         for name,content in c.execute("select tool_name,content from messages where session_id=? and role='tool'",(session,)):
             if name not in ('x_search','web_search','web_extract'):continue
             try:
@@ -147,6 +147,7 @@ def run(research=False,local=False):
                     collect_awards(symbol,base,config['token']);good+=1;bad-=1;failures.remove(path)
                 except Exception:pass
         signals=get('/api/research/signals?symbol='+symbol).get('items',[])
+        get('/api/research/map?symbol='+symbol)
         for s in signals:
             if s['id'] not in old.get('researched',[]):candidates.append(s)
     # At most one investigation per run. Plain research only: no trades, messages or account changes.

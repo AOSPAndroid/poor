@@ -49,7 +49,7 @@ def run(refresh=False):
         recent=[{'title':a['title'],'sources':a['sources']} for e in editions[:7] for a in e['articles']]
         context={};initial_sources=set()
         try:
-            feed=c.request(base,'/api/feed/congress')
+            feed=c.request(base,'/api/research/politics')
             if not c.feed_problem(feed):
                 rows=sorted(feed.get('value',{}).get('rows',[]),key=lambda r:r['filed'],reverse=True)[:20]
                 context['disclosures']=[{k:r.get(k) for k in ['person','ticker','type','asset','owner','traded','filed','amount','source']} for r in rows]
@@ -83,4 +83,9 @@ def run(refresh=False):
     STATE.write_text(json.dumps({'date':str(today),'status':status,'published':result.get('published',0),'finishedAt':time.time()},indent=2))
     print(status)
 if __name__=='__main__':
-    parser=argparse.ArgumentParser();parser.add_argument('--refresh',action='store_true');run(parser.parse_args().refresh)
+    parser=argparse.ArgumentParser();parser.add_argument('--refresh',action='store_true');args=parser.parse_args()
+    try:run(args.refresh)
+    finally:
+        review=importlib.util.spec_from_file_location('review',Path(__file__).with_name('athena-review.py'));module=importlib.util.module_from_spec(review);review.loader.exec_module(module)
+        try:module.run()
+        except Exception:print('Research follow-up unavailable; next scheduled run will retry')

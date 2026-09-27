@@ -56,11 +56,14 @@ async function billResearch(env,symbol){if(!env.CONGRESS_API_KEY)return {items:[
  return observed(env,symbol,'bills',{items,coverage:'Keyword scan of the 250 most recently updated bills; committee referrals shown, not politician influence or verified company impact.'});}
 async function earningsResearch(env,symbol,cache){if(!env.ALPHA_VANTAGE_API_KEY)return {items:[],unavailable:true,coverage:'Earnings feed needs an Alpha Vantage API key; no date is assumed.'};
  const all=await cache(env,'earnings-calendar-v1',24*RHOUR,async()=>({rows:parseCalendar(await researchFetch('https://www.alphavantage.co/query?function=EARNINGS_CALENDAR&horizon=3month&apikey='+encodeURIComponent(env.ALPHA_VANTAGE_API_KEY)))}));if(!all.value||all.stale)throw Error('Earnings provider unavailable');const items=all.value.rows.filter(r=>r.symbol===symbol&&r.reportDate>=today()).map(r=>({id:'earnings:'+symbol+':'+r.reportDate,kind:'earnings',symbol,title:'Expected earnings',traded:r.reportDate,published:null,url:'https://www.alphavantage.co/documentation/#earnings-calendar',match:'Provider ticker',note:'Expected date; confirm with investor relations. Release time not supplied.',currency:r.currency}));return {...await observed(env,symbol,'earnings',{items,coverage:items.length?'3-month provider calendar; dates can change.':'No date found in the next 3 months; this does not establish there is no earnings risk.'}),stale:all.stale};}
-export async function researchRoute(url,env,cache){const path=url.pathname;if(path==='/api/research/treasury')return cache(env,'treasury-v1',6*RHOUR,async()=>{const year=new Date().getUTCFullYear(),xml=await researchFetch('https://home.treasury.gov/resource-center/data-chart-center/interest-rates/pages/xml?data=daily_treasury_yield_curve&field_tdr_date_value='+year);return parseTreasury(xml)});
+export async function researchRoute(url,env,cache,priceLoader){const path=url.pathname;if(path==='/api/research/treasury')return cache(env,'treasury-v1',6*RHOUR,async()=>{const year=new Date().getUTCFullYear(),xml=await researchFetch('https://home.treasury.gov/resource-center/data-chart-center/interest-rates/pages/xml?data=daily_treasury_yield_curve&field_tdr_date_value='+year);return parseTreasury(xml)});
  if(path==='/api/research/status'){const o=await env.BUCKET.get('poor/research/collector');return {collector:o?await o.json():null,congressConnected:!!env.CONGRESS_API_KEY,earningsConnected:!!env.ALPHA_VANTAGE_API_KEY}}
- if(path==='/api/research/daily'){const o=await env.BUCKET.get('poor/research/daily');return o?await o.json():{editions:[],status:'Waiting for the first daily brief',schedule:'Daily at 08:00 Europe/Paris while the PC is awake and signed in'}};
+ if(path==='/api/research/politics'){const feed=await readResearch(env,'pif/v1/congress-roster-v2');return {value:{rows:mapPoliticalRows(feed),coverage:'Curated source records plus loaded feed; original provenance retained'}};}
+ if(path==='/api/research/daily')return dailyArchive(env);
+ if(path==='/api/research/performance')return articlePerformance(env,url.searchParams.get('id'),priceLoader);
  const symbol=url.searchParams.get('symbol');if(!/^[A-Z][A-Z0-9.-]{0,11}$/.test(symbol||''))return {error:'Invalid ticker'};
  if(path==='/api/research/signals')return evidenceSignals(env,symbol);
+ if(path==='/api/research/map')return connectionMap(env,symbol);
  if(path==='/api/research/agent'){const o=await env.BUCKET.get('poor/research/agent/'+symbol);if(!o)return {items:[],coverage:'No research received yet.'};const saved=await o.json();return {...saved,coverage:'Source-linked research leads; claims require verification and do not enter buying counts.',items:(saved.items||[]).map(i=>({...i,match:i.mode==='fallback'?'Research fallback - source lead, not a verified transaction':'Research interpretation'}))}}
  const source=url.searchParams.get('source');const loaders={sec:()=>secResearch(env,symbol,cache),awards:()=>awardResearch(env,symbol),policy:()=>policyResearch(env,symbol),bills:()=>billResearch(env,symbol),earnings:()=>earningsResearch(env,symbol,cache)};if(!loaders[source])return {error:'Unknown research source'};
  return cache(env,'research-v1/'+symbol+'/'+source,6*RHOUR,loaders[source]);}
@@ -89,6 +92,8 @@ export function validDailyThesis(a){
 export async function researchIngest(request,env){
  const token=request.headers.get('Authorization');if(!env.RESEARCH_INGEST_TOKEN||token!=='Bearer '+env.RESEARCH_INGEST_TOKEN)return {status:401,body:{error:'Unauthorized'}};
  if(!(request.headers.get('Content-Type')||'').startsWith('application/json'))return {status:415,body:{error:'JSON required'}};const text=await request.text();if(text.length>100000)return {status:413,body:{error:'Too large'}};let b;try{b=JSON.parse(text)}catch{return {status:400,body:{error:'Invalid JSON'}}}
+ if(b.kind==='review-status'){await env.BUCKET.put('poor/research/reviewer-status',JSON.stringify({checkedAt:new Date().toISOString(),status:String(b.status||'').slice(0,200)}));return {status:200,body:{ok:true}};}
+ if(b.kind==='review')return ingestReview(b,env);
  if(b.kind==='daily'){
   if(!day(b.date)||b.date>today()||!Array.isArray(b.articles)||b.articles.length>4)return {status:400,body:{error:'Invalid daily edition'}};
   const articles=[];
@@ -100,8 +105,9 @@ export async function researchIngest(request,env){
   }
   const object=await env.BUCKET.get('poor/research/daily'),old=object?await object.json():{editions:[]},now=new Date().toISOString();
   const editions=old.editions||[],known=new Set(editions.flatMap(e=>e.articles).map(a=>[...a.sources].sort().join('|')));const fresh=articles.filter(a=>!known.has([...a.sources].sort().join('|')));
+  for(const a of fresh){a.id=await researchId(now+'|'+a.title+'|'+a.sources.join('|'));a.publishedAt=now;}
   if(fresh.length)editions.unshift({date:b.date,createdAt:now,articles:fresh});
-  const next={editions:editions.slice(0,30),lastAttempt:now,status:String(b.status|| (fresh.length?'Published '+fresh.length+' new briefs':'No qualifying new stories')).slice(0,300),schedule:'Daily at 08:00 Europe/Paris while the PC is awake and signed in'};
+  const next={editions:editions,lastAttempt:now,status:String(b.status|| (fresh.length?'Published '+fresh.length+' new briefs':'No qualifying new stories')).slice(0,300),schedule:'Daily at 08:00 Europe/Paris while the PC is awake and signed in'};
   await env.BUCKET.put('poor/research/daily',JSON.stringify(next));return {status:200,body:{ok:true,published:fresh.length}};
  }
  if(b.kind==='collector'){const status={lastRun:new Date().toISOString(),successful:Number(b.successful)||0,failed:Number(b.failed)||0,issues:(Array.isArray(b.issues)?b.issues:[]).slice(0,100).map(i=>({path:String(i.path||'').slice(0,180),reason:String(i.reason||'').slice(0,100)})),fallbackStatus:String(b.fallbackStatus||'Not run').slice(0,300),agentStatus:String(b.agentStatus||'No new overlap').slice(0,300),schedule:'Every 6 hours while this PC is awake and you are signed in'};await env.BUCKET.put('poor/research/collector',JSON.stringify(status));return {status:200,body:{ok:true}}}
@@ -119,3 +125,66 @@ export async function researchIngest(request,env){
  const items=b.items.map(r=>({title:String(r.title||'').slice(0,200),summary:String(r.summary||'').slice(0,1200),url:String(r.url||''),published:day(r.published)?r.published:null,firstObserved:new Date().toISOString(),kind:'agent',mode:b.mode==='fallback'?'fallback':'overlap',match:b.mode==='fallback'?'Research fallback - source lead, not a verified transaction':'poor research · unverified inference'}));if(items.some(r=>!r.title||!/^https:\/\//.test(r.url)||r.url.length>1500))return {status:400,body:{error:'Reports need HTTPS source links'}};
  const previous=await env.BUCKET.get('poor/research/agent/'+b.symbol);const existing=previous?(await previous.json()).items||[]:[];const merged=[...new Map([...items,...existing].map(i=>[i.url+'|'+i.title,i])).values()].slice(0,30);await env.BUCKET.put('poor/research/agent/'+b.symbol,JSON.stringify({items:merged,updatedAt:new Date().toISOString(),coverage:'poor research leads. Claims require primary-source verification; not counted in purchase signals.'}));return {status:200,body:{ok:true}};
 }
+
+// Connection records are evidence, not a probability of confidential information.
+const readResearch=async(env,key)=>{const o=await env.BUCKET.get(key);return o?await o.json():null};
+async function researchId(text){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text)))).map(v=>v.toString(16).padStart(2,'0')).join('').slice(0,24)}
+async function dailyArchive(env){
+ const saved=await readResearch(env,'poor/research/daily')||{editions:[],status:'Waiting for the first research thesis'};
+ for(const e of saved.editions||[])for(const a of e.articles){a.id||=await researchId(e.createdAt+'|'+a.title+'|'+a.sources.join('|'));a.publishedAt||=e.createdAt||null;}
+ const reviews=await readResearch(env,'poor/research/reviews')||{};
+ return {...saved,reviewer:await readResearch(env,'poor/research/reviewer-status'),editions:(saved.editions||[]).map(e=>({...e,articles:e.articles.map(a=>({...a,reviews:reviews[a.id]||[]}))}))};
+}
+export function evaluateArticle(p,spy,publishedAt,locked){
+ if(!publishedAt||!Number.isFinite(Date.parse(publishedAt)))return {status:'Publication time unknown'};
+ const dates=Object.keys(p?.closes||{}).filter(d=>day(d)&&d<=p.asOf&&p.closes[d]>0).sort(),entry=locked?.entry||dates.find(d=>d>publishedAt.slice(0,10));
+ if(!entry)return {status:'Awaiting first close after publication'};
+ if(!locked&&(Date.parse(entry)-Date.parse(publishedAt.slice(0,10)))/86400000>7)return {status:'Entry history unavailable'};
+ const entryPrice=p?.closes?.[entry],currency=locked?.currency||p?.currency;
+ if(!(entryPrice>0))return {status:'Entry history unavailable',basis:locked};
+ if(!(entryPrice>0)||!p?.latest||p.asOf<entry||currency!==p.currency)return {status:'Comparable price unavailable',basis:locked};
+ const spyEntry=spy?.closes?.[entry],last=spy?.closes?.[p.asOf],since=(p.latest/entryPrice-1)*100;
+ const series=dates.filter(d=>d>=entry);let peak=entryPrice,drawdown=0;
+ for(const d of series){peak=Math.max(peak,p.closes[d]);drawdown=Math.min(drawdown,(p.closes[d]/peak-1)*100)}
+ const complete=series[0]===entry;
+ return {status:'Tracking',entry,entryPrice,currency,asOf:p.asOf,latest:p.latest,return:since,excess:spyEntry>0&&last>0?since-(last/spyEntry-1)*100:null,drawdown:complete?drawdown:null,sessions:complete?series.length-1:null,forward:[5,20,60].map(n=>{const end=complete?series[n]:null;return {sessions:n,end:end||null,return:end?(p.closes[end]/entryPrice-1)*100:null}}),basis:{entry,entryPrice,currency,spyEntry:spyEntry||null,originalEntryPrice:locked?.originalEntryPrice||entryPrice}};
+}
+async function articlePerformance(env,id,priceLoader){
+ if(!/^[a-f0-9]{24}$/.test(id||''))return {error:'Invalid article'};
+ const archive=await dailyArchive(env),a=archive.editions.flatMap(e=>e.articles).find(a=>a.id===id);if(!a)return {error:'Article not found'};
+ const old=await readResearch(env,'poor/research/performance/'+id)||{basis:{}},symbols=[...new Set(a.tickers)];
+ const quotes=Object.fromEntries(await Promise.all([...new Set([...symbols,'SPY'])].map(async s=>{try{return [s,priceLoader?await priceLoader(env,s):await readResearch(env,'pif/v1/prices-v3/'+s)]}catch{return [s,null]}})));
+ const rows=symbols.map(symbol=>{const q=quotes[symbol],r=evaluateArticle(q?.value,quotes.SPY?.value,a.publishedAt,old.basis[symbol]);if(r.basis)old.basis[symbol]=r.basis;return {symbol,...r,basis:undefined,stale:!!q?.stale||!!q?.error,benchmarkStale:!!quotes.SPY?.stale||!!quotes.SPY?.error,source:q?.value?.source||null}});
+ const result={id,publishedAt:a.publishedAt,rows,updatedAt:new Date().toISOString(),method:'Hypothetical long stock price return from the first daily close strictly after the publication UTC date. Each ticker separately; no assumed basket. Excludes dividends, fees, taxes and slippage. SPY uses identical dates. Drawdown uses daily closes; options are not modeled.'};
+ await env.BUCKET.put('poor/research/performance/'+id,JSON.stringify({...old,result}));return result;
+}
+async function ingestReview(b,env){
+ if(!/^[a-f0-9]{24}$/.test(b.articleId||'')||!['supported','mixed','challenged','invalidated','inconclusive'].includes(b.verdict)||typeof b.summary!=='string'||!b.summary.trim()||b.summary.length>1000||!Array.isArray(b.sources)||!b.sources.length||b.sources.length>6||b.sources.some(u=>{try{const x=new URL(u);return x.protocol!=='https:'||!!x.username||!!x.password||u.length>1500}catch{return true}}))return {status:400,body:{error:'Invalid review'}};
+ const a=(await dailyArchive(env)).editions.flatMap(e=>e.articles).find(a=>a.id===b.articleId);if(!a)return {status:404,body:{error:'Unknown article'}};
+ const all=await readResearch(env,'poor/research/reviews')||{},list=all[b.articleId]||[];
+ if(list.some(r=>r.summary===b.summary&&r.verdict===b.verdict))return {status:200,body:{ok:true,duplicate:true}};
+ list.push({verdict:b.verdict,summary:b.summary,sources:b.sources,reviewedAt:new Date().toISOString()});all[b.articleId]=list;
+ await env.BUCKET.put('poor/research/reviews',JSON.stringify(all));return {status:200,body:{ok:true}};
+}
+async function connectionMap(env,symbol){
+ const [congress,daily,old,...feeds]=await Promise.all([readResearch(env,'pif/v1/congress-roster-v2'),dailyArchive(env),readResearch(env,'poor/research/map/'+symbol),...['sec','awards','policy','bills','earnings'].map(s=>readResearch(env,'pif/v1/research-v1/'+symbol+'/'+s)),readResearch(env,'poor/research/agent/'+symbol)]);
+ const now=new Date().toISOString(),nodes=new Map((old?.nodes||[]).map(n=>[n.id,n])),edges=new Map((old?.edges||[]).map(e=>[e.id,e]));
+ const root='stock:'+symbol;nodes.set(root,{id:root,kind:'stock',label:symbol,status:'record',detail:researchUniverse[symbol]?.[0]||symbol});
+ const add=async(record,to=root,relation='Relates to')=>{const id=record.id||await researchId(record.kind+'|'+record.url+'|'+record.label+'|'+record.date);nodes.set(id,{...record,id,firstObserved:nodes.get(id)?.firstObserved||record.firstObserved||now,lastSeen:now});const eid=id+'>'+to;edges.set(eid,{id:eid,from:id,to,relation,status:record.status});return id};
+ for(const r of mapPoliticalRows(congress)){if(r.ticker!==symbol)continue;await add({id:await researchId('political|'+[r.id,r.source,r.person,r.traded,r.type,r.asset,r.owner].join('|')),kind:'political',label:r.person,subtitle:r.type+' · '+r.asset,detail:[r.type,r.asset,r.owner,r.amount,r.notes,'Trade '+r.traded,'Disclosed '+(r.disclosed||r.filed)].filter(Boolean).join(' · '),date:r.disclosed||r.filed,eventDate:r.traded,url:r.source,status:r.quality==='Secondary source'?'candidate':'record',provenance:r.quality||'Disclosed transaction',firstObserved:r.firstObserved},root,r.type==='Purchase'?'Disclosed purchase':'Disclosed '+r.type.toLowerCase())}
+ const names=['sec','awards','policy','bills','earnings','agent'];const coverage=[];
+ feeds.forEach((r,i)=>coverage.push({source:names[i],count:(r?.value?.items||r?.items||[]).length,checkedAt:r?.checkedAt?new Date(r.checkedAt).toISOString():r?.updatedAt||null,state:!r?'Not loaded':r.error?'Unavailable; saved records':r.value?.unavailable?'Not connected':r.value?.partial?'Partial':r.checkedAt&&Date.now()-r.checkedAt>7*RHOUR?'Stale snapshot':'Loaded',note:r?.value?.coverage||r?.coverage||''}));
+ for(let i=0;i<feeds.length;i++){const r=feeds[i];for(const x of (r?.value?.items||r?.items||[]))await add({id:x.id?await researchId(names[i]+'|'+x.id):undefined,kind:x.kind||names[i],label:x.title,detail:x.summary||x.description||x.note||x.match||'',date:x.published?.slice(0,10)||x.traded||null,eventDate:x.traded,url:x.url,status:['policy','bill','agent','award','earnings'].includes(x.kind)?'candidate':'record',provenance:x.match||'',firstObserved:x.firstObserved,amount:x.amount},root,x.kind==='insider'?(x.purchase?'Filed purchase':'Filed '+(x.note||'transaction')):x.kind==='award'?'Award candidate':x.kind==='policy'?'Sector keyword match':x.kind==='agent'?'Research lead':'Research context')}
+ const [price,benchmark,signals,treasury]=await Promise.all([readResearch(env,'pif/v1/prices-v3/'+symbol),readResearch(env,'pif/v1/prices-v3/SPY'),readResearch(env,'poor/research/signals/'+symbol),readResearch(env,'pif/v1/treasury-v1')]);
+ const quote=price?.value,dates=Object.keys(quote?.closes||{}).sort();if(quote?.latest>0){const start=dates.at(-21),move=start?(quote.latest/quote.closes[start]-1)*100:null,b=benchmark?.value?.closes,relative=move!==null&&b?.[start]>0&&b?.[quote.asOf]>0?move-(b[quote.asOf]/b[start]-1)*100:null;await add({id:'market:'+symbol,kind:'market',label:'Price & relative strength',detail:'Close '+quote.latest.toFixed(2)+' '+quote.currency+(move===null?'':' · 20 sessions '+move.toFixed(2)+'%')+(relative===null?'':' · vs SPY '+relative.toFixed(2)+' pp')+' · Historical prices, not a forecast',date:quote.asOf,url:quote.source,status:'record'},root,'Market pricing context')}
+ for(const x of signals?.records||[])await add({id:'signal:'+x.id,kind:'cluster',label:x.politicians.length+' political households'+(x.insiderOwners?' + '+x.insiderOwners+' corporate owners':''),detail:x.politicians.join(', ')+' · trades '+x.start+' to '+x.end+' · all public by '+x.publicBy+'. Co-occurrence is a lead, not proof of coordination.',date:x.publicBy,status:'inference',sources:x.sources,firstObserved:x.firstObserved},root,'Buying overlap');
+ const yieldRow=treasury?.value?.rows?.at(-1);if(yieldRow)await add({id:'macro:treasury',kind:'market',label:'Treasury rate context',detail:'10-year yield '+yieldRow.y10+'% · 2-year '+(yieldRow.y2??'unknown')+'%. Broad valuation / financing context; company impact requires research.',date:yieldRow.date,url:treasury.value.url,status:'candidate'},root,'Macro context');
+ const theses=daily.editions.flatMap(e=>e.articles).filter(a=>a.format===2&&a.tickers.includes(symbol));
+ for(const a of theses){const id='thesis:'+a.id;await add({id,kind:'thesis',label:a.title,detail:a.tldr,status:'inference',date:a.publishedAt?.slice(0,10),articleId:a.id,why:a.why,pricedIn:a.pricedIn,watch:a.watch,invalidation:a.invalidation,risk:a.risk,horizon:a.horizon,review:a.reviews?.at(-1),sources:a.sources},root,'Why this stock now?');
+  for(const e of a.evidence)await add({kind:e.kind,label:e.fact,detail:e.fact,date:e.date,url:e.url,status:'sourced',provenance:'Sourced claim in research; inspect original document'},id,'Evidence for hypothesis');
+ }
+ const sorted=[...nodes.values()].sort((a,b)=>(b.date||'').localeCompare(a.date||''));const saved={symbol,nodes:sorted,edges:[...edges.values()],updatedAt:now,coverage:[{source:'political',count:mapPoliticalRows(congress).filter(r=>r.ticker===symbol).length,state:congress?.value?'Loaded':'Not loaded',checkedAt:congress?.checkedAt?new Date(congress.checkedAt).toISOString():null},...coverage]};
+ await env.BUCKET.put('poor/research/map/'+symbol,JSON.stringify(saved));return saved;
+}
+
+function mapPoliticalRows(feed){const curated=typeof STATIC_RESEARCH_ROWS==='undefined'?[]:STATIC_RESEARCH_ROWS;const key=r=>[r.source,r.person,r.ticker,r.traded].join('|'),known=new Set(curated.map(key));return [...curated,...(feed?.value?.rows||[]).filter(r=>!known.has(key(r)))];}
