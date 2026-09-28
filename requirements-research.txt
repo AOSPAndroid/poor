@@ -1,3 +1,4 @@
 # Installed in the existing Hermes environment; no browser or trading permissions.
 trafilatura==2.2.0
 networkx==3.6.1
+pypdf==6.19.0
