@@ -3,11 +3,13 @@ let value=null,etag=0;const env={RESEARCH_INGEST_TOKEN:'secret',BUCKET:{get:asyn
 const req=(who,body,worker=false)=>new Request('https://test/api/chat'+(worker?'/worker':''),{method:body?'POST':'GET',headers:worker?{Authorization:'Bearer secret'}:{'oai-authenticated-user-id':who,'oai-authenticated-user-email':who+'@test','Origin':'https://test','Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
 assert.equal((await chatRoute(new Request('https://test/api/chat'),env)).status,401);
 assert.equal((await chatRoute(req('a',{message:'Hello'}),env)).status,503);
+assert.equal((await chatRoute(req('a',{message:'Hello',context:'x'.repeat(3001)}),env)).status,400);
+assert.equal((await chatRoute(req('a',{message:'Hello',context:{page:'bad'}}),env)).status,400);
 await chatRoute(req('',{op:'heartbeat'},true),env);
-assert.equal((await chatRoute(req('a',{message:'Question one',symbol:'BE',thread:'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'}),env)).status,202);
+assert.equal((await chatRoute(req('a',{message:'Question one',context:'Current page: Workspace BE',symbol:'BE',thread:'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'}),env)).status,202);
 assert.equal((await chatRoute(req('a',{message:'Duplicate'}),env)).status,409);
 assert.equal((await chatRoute(req('b'),env)).body.messages.length,0);
-const claim=(await chatRoute(req('',{op:'claim'},true),env)).body.job;assert.equal(claim.message,'Question one');assert.equal(claim.history.length,0);
+const claim=(await chatRoute(req('',{op:'claim'},true),env)).body.job;assert.equal(claim.message,'Question one');assert.equal(claim.context,'Current page: Workspace BE');assert.equal(claim.history.length,0);
 assert.equal((await chatRoute(req('',{op:'finish',id:claim.id,claim:'bad',answer:'bad'},true),env)).status,409);
 await chatRoute(req('',{op:'finish',id:claim.id,claim:claim.claim,answer:'Sourced answer'},true),env);
 assert.equal((await chatRoute(req('a'),env)).body.messages[0].answer,'Sourced answer');assert.equal((await chatRoute(req('b'),env)).body.messages.length,0);
