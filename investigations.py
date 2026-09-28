@@ -156,7 +156,7 @@ def run(monitor_only=False,max_new=3):
                 ok=False
                 try:
                     report,allowed=run_report(prompt_for(candidate),allowed_sources(candidate),seconds=45,max_pages=4,writing_seconds=60)
-                    finding=validate_case(report,allowed);ok=True
+                    finding=validate_case(report,allowed);ok=finding['verdict']!='unverified'
                     if finding['verdict'] in ('supported','wait'):
                         try:publish_news(report,candidate,finding,base,token)
                         except Exception:print('Decision brief retained; news format or date did not qualify')
@@ -169,7 +169,7 @@ def run(monitor_only=False,max_new=3):
                     try:
                         state['cases'][candidate['id']]['articleId']=publish_stock_thesis(report,candidate,finding,allowed,base,token);save(state)
                     except Exception:print('Decision brief saved; full thesis did not meet publication requirements')
-            cases=sorted(state['cases'].values(),key=lambda v:v['createdAt'],reverse=True)
+            cases=sorted(state['cases'].values(),key=lambda v:(v['finding']['verdict']=='supported',v['candidate'].get('priority',0),v['createdAt']),reverse=True)
             for case in cases:
                 if case.get('challengeDate')==today or case.get('challengeOK') or case['finding']['verdict'] not in ('supported','wait') or time.time()-case['createdAt']>7*86400:continue
                 candidate=case['candidate']
