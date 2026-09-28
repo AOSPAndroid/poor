@@ -97,7 +97,7 @@ export function validateWorkspaceAction(action){
  if(action.kind==='deleteRule'&&(typeof action.id!=='string'||action.id.length>100))throw Error('Invalid rule');
 }
 export function evaluateRules(state,records,prices,now=Date.now()){
- const events=[];for(const rule of state.rules){
+ const events=politicianFilingEvents(state,records,now);for(const rule of state.rules){
   if(rule.type==='filings'){
    const matching=records.filter(r=>r.ticker===rule.symbol);const ids=matching.map(r=>r.id);const previous=new Set(rule.seen||[]);
    if(rule.initialized){for(const row of matching.filter(r=>!previous.has(r.id))){events.push({id:'filing:'+rule.id+':'+row.id,symbol:rule.symbol,title:`${row.person} · ${row.type} ${rule.symbol}`,detail:`Traded ${row.traded}; reported ${row.filed}. Newly observed by poor, not necessarily newly published.`,source:row.source,at:now})}}
@@ -133,6 +133,7 @@ async function workspace(request,env){
   if(action?.kind==='followPolitician'){
    const people=Array.isArray(state.followedPoliticians)?state.followedPoliticians:[];
    state.followedPoliticians=action.enabled?[...new Set([...people,action.person])]:people.filter(p=>p!==action.person);
+   if(!action.enabled&&state.followedFilingState)delete state.followedFilingState[action.person];
    if(state.followedPoliticians.length>100)return json({error:'Follow up to 100 politicians'},400);
   }
   if(action?.kind==='researchPriority'){if(!user)return json({error:'Sign in to prioritize favorites'},401);state.researchPriority=action.enabled;}
@@ -143,12 +144,12 @@ async function workspace(request,env){
   }
   if(action?.kind==='deleteRule')state.rules=state.rules.filter(r=>r.id!==action.id);
   if(action?.kind==='readAlerts')state.readAt=Date.now();
-  if(state.rules.length&&(action?.kind==='rule'||Date.now()-state.evaluatedAt>60000)){
+  if((state.rules.length||state.followedPoliticians?.length)&&(action?.kind==='rule'||action?.kind==='followPolitician'||Date.now()-state.evaluatedAt>60000)){
    const feeds=await Promise.all(['congress-universe-v4'].map(async k=>{const o=await env.BUCKET.get('pif/v1/'+k);return o?await o.json():null}));
    const records=feeds.flatMap(f=>f?.value?.rows||[]);const symbols=[...new Set(state.rules.filter(r=>r.type.startsWith('price')).map(r=>r.symbol))];const prices={};
    // Use cached quotes; browser's normal update loop obtains new quotes before checking alerts.
    for(const s of symbols){const o=await env.BUCKET.get('pif/v1/prices-v4/'+s);if(o)prices[s]=await o.json()}
-   if(feeds.every(f=>f?.value&&!f.stale&&!f.error&&Date.now()-f.checkedAt<6*HOUR))evaluateRules(state,records,prices);else{const rules=state.rules.filter(r=>r.type.startsWith('price')),evaluated=evaluateRules({...state,rules},[],prices);state.alerts=evaluated.alerts;state.evaluatedAt=evaluated.evaluatedAt}
+   if(feeds.every(f=>f?.value&&!f.stale&&!f.error&&Date.now()-f.checkedAt<6*HOUR))evaluateRules(state,records,prices);else{const rules=state.rules.filter(r=>r.type.startsWith('price')),evaluated=evaluateRules({...state,rules,followedPoliticians:[]},[],prices);state.alerts=evaluated.alerts;state.evaluatedAt=evaluated.evaluatedAt}
   }
   const saved=await env.BUCKET.put(key,JSON.stringify(state),{onlyIf:object?{etagMatches:object.etag}:{etagDoesNotMatch:'*'}});
   if(!saved)continue;
@@ -207,3 +208,21 @@ export default {async fetch(request,env){
   return new Response(request.method==='HEAD'?null:file.body,{headers:{'Content-Type':file.type,'Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'}});
  }catch(error){console.error('poor request failed',url.pathname,error.message);return json({error:'Service temporarily unavailable; saved data remains visible.'},503)}
 }};
+
+// Follow alerts establish a baseline before reporting newly observed public rows.
+export function politicianFilingEvents(state,records,now=Date.now()){
+ const events=[],today=new Date(now).toISOString().slice(0,10);state.followedFilingState||={};
+ const publicRows=records.filter(r=>r.quality!=='User-provided'&&r.traded&&r.traded<=today&&(r.disclosed||r.filed)&&(r.disclosed||r.filed)<=today);
+ const key=r=>[r.person,r.ticker,r.traded,r.disclosed||r.filed,r.type,r.asset,r.owner,r.amount,r.source].join('|');
+ for(const person of state.followedPoliticians||[]){
+  const rows=publicRows.filter(r=>r.person===person),old=state.followedFilingState[person],known=new Set(old?.seen||[]);
+  if(old)for(const r of rows){const k=key(r);if(known.has(k))continue;known.add(k);
+   const previous=rows.some(x=>x.ticker===r.ticker&&x.owner===r.owner&&x.asset===r.asset&&x.type==='Purchase'&&x.traded<r.traded);
+   const change=r.type==='Sale'?'Sale; remaining balance unknown':r.type==='Purchase'?(previous?'Repeat purchase in loaded history':'First purchase in loaded history'):'Exercise / instrument change';
+   const buyers=new Set(publicRows.filter(x=>x.person!==person&&x.ticker===r.ticker&&x.type==='Purchase'&&['Stock','ADR','Call options'].includes(x.asset)&&Math.abs(Date.parse(x.traded)-Date.parse(r.traded))<=30*86400000).map(x=>x.person));
+   events.push({id:'follow:'+k,symbol:r.ticker,person,title:person+' · '+r.type+' '+r.ticker,detail:change+'. '+r.amount+' · '+r.asset+' · '+(r.owner||'Ownership unknown')+'. Traded '+r.traded+'; disclosed '+(r.disclosed||r.filed)+'.'+(r.type==='Purchase'&&buyers.size?' '+buyers.size+' other household(s) bought within ±30 days; not proof of coordination.':'')+' Newly observed, possibly historical or amended; check the source.',source:r.source,at:now});
+  }
+  state.followedFilingState[person]={seen:[...new Set([...(old?.seen||[]),...rows.map(key)])]};
+ }
+ return events;
+}
