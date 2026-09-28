@@ -15,7 +15,7 @@ assert.equal((await request('')).VOO.value.latest,605);await request('');assert.
 await request('&refresh=1');assert.equal(calls,2);fail=true;const stale=await request('&refresh=1');assert.equal(stale.VOO.value.latest,605);assert.equal(stale.VOO.stale,true);
 assert.equal((await worker.fetch(new Request('https://poor.test/api/quotes?symbols=../secret'),env)).status,400);
 const nodes=new Map(),get=s=>{if(!nodes.has(s))nodes.set(s,{classList:{toggle:()=>{}},setAttribute:()=>{}});return nodes.get(s)},events={},requests=[],timers=[];
-const ctx=vm.createContext({console,Date,Set,Map,Number,Math,Promise,encodeURIComponent,PRICES:{VOO:{currency:'USD',latest:600,asOf:'2026-09-25',closes:{'2026-09-25':600}}},read:(k,d)=>d,persist:()=>{},marketSymbol:'VOO',workspaceState:{symbols:['VOO']},view:'market',tickerValid:s=>/^[A-Z]+$/.test(s),$:get,stamp:x=>x,date:x=>x,document:{hidden:false,addEventListener:(n,fn)=>events[n]=fn,createElement:()=>({setAttribute:()=>{}}),querySelector:()=>null},setTimeout:(fn,ms)=>{timers.push(ms);return timers.length},clearTimeout:()=>{},renderTerminal:()=>{},getLiveJSON:async u=>{requests.push(u);return {VOO:{value:currentQuote(raw,'VOO',now),checkedAt:now}}}});
+const ctx=vm.createContext({console,Date,Set,Map,Number,Math,Promise,encodeURIComponent,PRICES:{VOO:{currency:'USD',latest:600,asOf:'2026-09-25',closes:{'2026-09-25':600}}},read:(k,d)=>d,persist:()=>{},marketSymbol:'VOO',workspaceState:{symbols:['VOO']},view:'market',tickerValid:s=>/^[A-Z]+$/.test(s),$:get,stamp:x=>x,date:x=>x,matchMedia:()=>({matches:false}),document:{body:{append:()=>{}},querySelectorAll:()=>[],hidden:false,addEventListener:(n,fn)=>events[n]=fn,createElement:()=>({setAttribute:()=>{}}),querySelector:()=>null},setTimeout:(fn,ms)=>{timers.push(ms);return timers.length},clearTimeout:()=>{},renderTerminal:()=>{},getLiveJSON:async u=>{requests.push(u);return {VOO:{value:currentQuote(raw,'VOO',now),checkedAt:now}}}});
 get('#appUtilityMenu').append=()=>{};get('#commandButton').before=()=>{};
 vm.runInContext(fs.readFileSync('dist/quotes.js','utf8'),ctx);events.DOMContentLoaded();await vm.runInContext('quoteRunning',ctx);
 assert.ok(requests[0].includes('refresh=1'));assert.equal(timers.at(-1),30000);
@@ -25,3 +25,10 @@ get('#quoteAuto').onchange({target:{checked:false}});assert.equal(get('#quoteSec
 const count=requests.length;events.visibilitychange();assert.equal(requests.length,count);
 get('#quoteRefresh').onclick();await vm.runInContext('quoteRunning',ctx);assert.equal(requests.length,count+1);assert.ok(requests.at(-1).includes('refresh=1'));
 console.log('Passed: current quotes, trading status, provider timestamps, forced refresh, cache reuse, stale fallback, invalid symbols, 30/60s preference, auto off, manual/reload refresh and immutable historical closes.');
+
+const frames=[],el={dataset:{quoteNumber:'VOO:price',quoteValue:'100'},textContent:'$100',getClientRects:()=>[{}],animate:(f,o)=>frames.push({f,o})};
+ctx.document.querySelectorAll=()=>[el];
+vm.runInContext('var beforeTicks=captureQuoteNumbers()',ctx);el.dataset.quoteValue='101';el.textContent='$101';vm.runInContext('animateQuoteNumbers(beforeTicks)',ctx);assert.equal(frames.length,1);assert.equal(frames[0].f[0].transform,'translateY(5px)');
+vm.runInContext('beforeTicks=captureQuoteNumbers();animateQuoteNumbers(beforeTicks)',ctx);assert.equal(frames.length,1);
+el.dataset.quoteValue='99';el.textContent='$99';vm.runInContext('animateQuoteNumbers(beforeTicks)',ctx);assert.equal(frames[1].f[0].transform,'translateY(-5px)');ctx.matchMedia=()=>({matches:true});vm.runInContext('animateQuoteNumbers(beforeTicks)',ctx);assert.equal(frames.length,2);
+console.log('Passed: rising/falling price animation, unchanged values stay still and reduced motion suppresses animation.');
