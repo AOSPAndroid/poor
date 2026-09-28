@@ -167,7 +167,7 @@ import {chatRoute} from './chat.mjs';
 import {predictionsRoute} from './predictions.mjs';
 export default {async fetch(request,env){
  const url=new URL(request.url);
- if(url.pathname.startsWith('/api/predictions')){try{const r=await predictionsRoute(request,env,cached);return json(r.body,r.status)}catch{return json({error:'Prediction provider unavailable. No paper entry was saved.'},503)}}
+ if(url.pathname.startsWith('/api/predictions')){try{const r=await predictionsRoute(request,env,cached);return json(r.body,r.status)}catch{return json({error:'Prediction provider unavailable. Prices could not be verified.'},503)}}
  if(['/api/chat','/api/chat/worker'].includes(url.pathname)){try{const r=await chatRoute(request,env);return json(r.body,r.status)}catch{return json({error:'Chat temporarily unavailable'},503)}}
  if(url.pathname==='/api/research/ingest'&&request.method==='POST'){try{const r=await researchIngest(request,env);return json(r.body,r.status)}catch{return json({error:'Report rejected'},400)}}
  if(url.pathname==='/api/workspace'&&['GET','POST'].includes(request.method)){try{return await workspace(request,env)}catch(error){console.error('Workspace failure',error.message);return json({error:'Workspace temporarily unavailable'},503)}}
