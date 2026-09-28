@@ -36,3 +36,10 @@
 .home-stock-setups .setup-empty{padding:11px}.home-stock-setups .setup-empty b{font-size:13px}
 @media(max-width:1050px){.home-priority-grid{grid-template-columns:minmax(0,1.2fr) minmax(270px,1fr);gap:12px}.home-priority-grid .setup-grid{grid-template-columns:minmax(0,1fr)}.home-brief-column{padding-left:12px}}
 @media(max-width:700px){.home-priority-grid{grid-template-columns:minmax(0,1fr);gap:12px}.home-brief-column{border-left:0;border-top:1px solid #dce5df;padding:8px 0 0}.appbar>nav>.nav{min-height:42px;padding:8px 10px;font-size:12px}.home-focus>.home-heading h1{font-size:20px}.home-brief-column .news-card{padding-inline:0}.utility-pages .nav{min-height:44px}.home-focus .home-heading{gap:5px}.favorites-ribbon{margin-top:3px}.home-performance>summary,.home-more-news>summary{min-height:44px}}
+
+/* Shared track-record lettering across cards, maps, tables, ribbons and details. */
+[data-rating-grade="strong"],[data-rating-grade="positive"]{--track-ink:#13734b}
+[data-rating-grade="mixed"]{--track-ink:#a34c00}
+[data-rating-grade="weak"]{--track-ink:#b12e40}
+[data-rating-grade="insufficient-data"]{--track-ink:#59635e}
+[data-rating-grade],[data-rating-grade]>b,[data-rating-grade]>span,[data-rating-grade]>small{color:var(--track-ink)!important}
