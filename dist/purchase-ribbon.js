@@ -7,7 +7,8 @@ function ribbonPurchases(rows=signalData,now=Date.now()){
 }
 function purchaseTile(r,copy=false){
  const score=r._ribbonScore??homeTrackPriority(r.person),label=score>=65?'Strong':'Positive';
- return `<div class="purchase-quote"><div class="purchase-line"><button data-profile="${esc(r.person)}" ${copy?'tabindex="-1"':''} class="purchase-person">${esc(r.person)}</button><small class="purchase-rating" data-rating-grade="${label.toLowerCase()}" title="${label}${r._ribbonScore?' · saved rating':''} · One-year after-disclosure track record; not a win probability">${score}/100</small><button data-ticker="${esc(r.ticker)}" ${copy?'tabindex="-1"':''} class="purchase-symbol" aria-label="Open ${esc(r.ticker)} workspace">${esc(r.ticker)} ↗</button></div><div class="purchase-line"><b class="purchase-amount">${esc(r.amount||'Amount unavailable')}</b><small>${esc(r.asset)}</small></div><small class="purchase-date">Disclosed ${disclosedDate(r)?date(disclosedDate(r)):'Unknown'}${r.owner&&r.owner!=='Not specified'?' · '+esc(r.owner):''}</small></div>`;
+ const p=displayQuote(r.ticker);
+ return `<div class="purchase-quote"><button data-profile="${esc(r.person)}" ${copy?'tabindex="-1"':''} class="purchase-person">${esc(r.person)}</button><small class="purchase-rating" data-rating-grade="${label.toLowerCase()}" title="${label} · after-disclosure track record">${score}/100</small><span>bought</span><button data-ticker="${esc(r.ticker)}" ${copy?'tabindex="-1"':''} class="purchase-symbol" title="${esc(quoteLabel(p))}"><b>${esc(r.ticker)}</b> <strong ${quoteNumberAttrs(r.ticker+':price:'+p?.currency,p?.latest)}>${p?.latest?money(p.latest,p.currency):'—'}</strong><span class="ribbon-spark">${liveMiniChart(r.ticker)}</span></button><b class="purchase-amount">${esc(r.amount||'Amount unavailable')}</b><small>${esc(r.asset)}</small><small class="purchase-date">Disclosed ${disclosedDate(r)?date(disclosedDate(r)):'Unknown'}</small>${p?.stale||p?.delayed?'<small class="ribbon-warning">'+(p.stale?'Stale':'Delayed')+'</small>':''}</div>`;
 }
 let purchasesSaved=read('poor-purchases-snapshot-v1',null),purchasesLoading=false,purchasesChecked=0;const purchasePriceChecks=new Map();
 let purchasesSignature='',purchasesPaused=read('poor-purchases-paused',false),purchasesHover=false,purchasesHoldUntil=0,purchasesFrame=0,purchasesRemainder=0;
@@ -18,15 +19,16 @@ function renderPurchasesRibbon(force=false){
  const saved=!fresh.length?savedRibbonPurchases(purchasesSaved):[],rows=fresh.length?fresh:saved,cached=!fresh.length&&!!saved.length;
  const status=cached?(purchasesLoading?'Saved · refreshing ratings':'Saved · current ratings unavailable'):purchasesLoading?'Checking ratings…':purchasesChecked?'Positive / Strong · past 90 days':'Loading purchases…';
  const statusEl=$('#purchasesRibbonStatus');if(statusEl){statusEl.textContent=status;statusEl.title=cached?'Saved '+stamp(purchasesSaved.at)+'; current ratings unavailable.':status}
- const signature=JSON.stringify([rows.map(r=>[r,r._ribbonScore??homeTrackPriority(r.person)]),status]);if(!force&&signature===purchasesSignature)return;purchasesSignature=signature;
+ const signature=JSON.stringify([rows.map(r=>[r,r._ribbonScore??homeTrackPriority(r.person),displayQuote(r.ticker)]),status]);if(!force&&signature===purchasesSignature)return;purchasesSignature=signature;
  $('#purchasesMotion').hidden=!rows.length;
  if(!rows.length){el.innerHTML='<span class="favorite-empty">'+(purchasesLoading||!purchasesChecked?'Loading purchases and checking track records…':'No qualifying buys verified yet. Some price histories may be unavailable. <button data-view="trades">Browse all trades →</button>')+'</span>';return}
- const repeats=Math.max(1,Math.ceil(vp.clientWidth/(rows.length*340))),original=rows.map(r=>purchaseTile(r)).join(''),copy=rows.map(r=>purchaseTile(r,true)).join('');
- el.innerHTML=`<div class="purchases-group">${original}${Array.from({length:repeats-1},()=>`<span class="purchases-copy" aria-hidden="true">${copy}</span>`).join('')}</div><div class="purchases-group" aria-hidden="true">${copy.repeat(repeats)}</div>`;vp.scrollLeft=0;
+ const scroll=vp.scrollLeft;const repeats=Math.max(1,Math.ceil(vp.clientWidth/(rows.length*340))),original=rows.map(r=>purchaseTile(r)).join(''),copy=rows.map(r=>purchaseTile(r,true)).join('');
+ el.innerHTML=`<div class="purchases-group">${original}${Array.from({length:repeats-1},()=>`<span class="purchases-copy" aria-hidden="true">${copy}</span>`).join('')}</div><div class="purchases-group" aria-hidden="true">${copy.repeat(repeats)}</div>`;vp.scrollLeft=scroll%($('#purchasesTrack .purchases-group')?.offsetWidth||1);
 }
-function updatePurchasesMotion(){const b=$('#purchasesMotion');b.textContent=purchasesPaused?'Play':'Pause';b.setAttribute('aria-pressed',String(purchasesPaused));b.setAttribute('aria-label',(purchasesPaused?'Start':'Pause')+' political purchases scrolling');persist('poor-purchases-paused',purchasesPaused)}
+function updatePurchasesMotion(){const b=$('#purchasesMotion');b.textContent=purchasesPaused?'▶':'Ⅱ';b.setAttribute('aria-pressed',String(purchasesPaused));b.setAttribute('aria-label',(purchasesPaused?'Start':'Pause')+' political purchases scrolling');persist('poor-purchases-paused',purchasesPaused)}
 if(typeof window!=='undefined'){
  const vp=$('#purchasesViewport'),reduce=matchMedia('(prefers-reduced-motion: reduce)');if(reduce.matches)purchasesPaused=true;
+ $('#purchasesAll').textContent='↗';$('#purchasesAll').title='All political trades';$('#purchasesAll').setAttribute('aria-label','All political trades');const title=vp.closest('.purchases-ribbon').querySelector('.favorites-ribbon-head>b');if(title)title.textContent='Political buys';
  $('#purchasesMotion').onclick=()=>{purchasesPaused=!purchasesPaused;updatePurchasesMotion()};updatePurchasesMotion();
  vp.addEventListener('mouseenter',()=>purchasesHover=true);vp.addEventListener('mouseleave',()=>purchasesHover=false);
  for(const event of ['pointerdown','pointermove','wheel','touchstart','touchend','keydown'])vp.addEventListener(event,()=>purchasesHoldUntil=performance.now()+6000,{passive:true});

@@ -32,3 +32,7 @@ vm.runInContext('var beforeTicks=captureQuoteNumbers()',ctx);el.dataset.quoteVal
 vm.runInContext('beforeTicks=captureQuoteNumbers();animateQuoteNumbers(beforeTicks)',ctx);assert.equal(frames.length,1);
 el.dataset.quoteValue='99';el.textContent='$99';vm.runInContext('animateQuoteNumbers(beforeTicks)',ctx);assert.equal(frames[1].f[0].transform,'translateY(-5px)');ctx.matchMedia=()=>({matches:true});vm.runInContext('animateQuoteNumbers(beforeTicks)',ctx);assert.equal(frames.length,2);
 console.log('Passed: rising/falling price animation, unchanged values stay still and reduced motion suppresses animation.');
+
+const intraraw={chart:{result:[{meta,timestamp:[Math.floor(now/1000)-120,Math.floor(now/1000)-60,Math.floor(now/1000)+100],indicators:{quote:[{close:[601,603,999]}]}}]}};
+const iq=currentQuote(intraraw,'VOO',now);assert.deepEqual(iq.intraday.map(x=>x[1]),[601,603,605]);assert.equal(iq.intraday.at(-1)[0],meta.regularMarketTime*1000);assert.deepEqual(currentQuote(raw,'VOO',now).intraday,[]);
+console.log('Passed: intraday series uses real timestamps, drops future points and ends at the latest provider quote.');

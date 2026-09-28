@@ -2,7 +2,7 @@
 const CURRENT_QUOTES={};let quoteRunning=null,quoteTimer=null,quoteSeconds=read('poor-quote-seconds',30)===60?60:30,quoteAuto=read('poor-quote-auto',true)!==false;
 function displayQuote(symbol){const base=PRICES[symbol],q=CURRENT_QUOTES[symbol];if(!q?.latest||base&&q.currency!==base.currency||base?.asOf>q.asOf)return base;return {...base,...q,stale:!!q.stale||Date.now()-q.checkedAt>Math.max(180000,quoteSeconds*3000)};}
 function quoteLabel(p){return p?.quoteAt?`${p.stale?'Stale':p.marketOpen?(p.delayed?'Delayed':'Latest quote'):'Market closed'} · ${stamp(p.quoteAt)}`:p?'Close '+date(p.asOf)+(p.stale?' · stale':''):'Loading quote…';}
-function quoteSymbols(){return [...new Set([marketSymbol,...workspaceState.symbols,...(workspaceState.portfolioTransactions||[]).map(t=>t.symbol),...(view==='home'?[...HOME_SECTOR_SYMBOLS,...HOME_ETFS,...HOME_TECH_ETFS,...HOME_STOCKS]:[])])].filter(tickerValid).slice(0,100);}
+function quoteSymbols(){return [...new Set([marketSymbol,...workspaceState.symbols,...(workspaceState.portfolioTransactions||[]).map(t=>t.symbol),...(view==='home'?[...(typeof ribbonPurchases==='function'?ribbonPurchases().map(r=>r.ticker):[]),...(typeof savedRibbonPurchases==='function'?savedRibbonPurchases(purchasesSaved).map(r=>r.ticker):[]),...HOME_SECTOR_SYMBOLS,...HOME_ETFS,...HOME_TECH_ETFS,...HOME_STOCKS]:[])])].filter(tickerValid).slice(0,100);}
 function currentPortfolioPrices(){const result={...PRICES};for(const s of quoteSymbols())result[s]=displayQuote(s);return result;}
 function paintCurrentQuotes(){
  const previous=captureQuoteNumbers();
@@ -45,3 +45,10 @@ document.addEventListener('DOMContentLoaded',()=>{
  document.addEventListener('visibilitychange',()=>{clearTimeout(quoteTimer);if(!document.hidden&&quoteAuto)refreshCurrentQuotes()});
  document.addEventListener('click',e=>{if(e.target.closest('[data-ticker],[data-view]')&&quoteAuto)setTimeout(()=>refreshCurrentQuotes(),0)});
 });
+
+function liveMiniChart(symbol){
+ const p=displayQuote(symbol),points=p?.intraday;if(!Array.isArray(points)||points.length<2)return '<span class="ribbon-chart-empty">Chart pending</span>';
+ const values=points.map(v=>v[1]),lo=Math.min(...values),hi=Math.max(...values),from=points[0][0],to=points.at(-1)[0],x=t=>2+(t-from)/Math.max(1,to-from)*96,y=v=>21-(v-lo)/Math.max(.01,hi-lo)*18;
+ const path=points.map(([t,v],i)=>`${i?'L':'M'}${x(t).toFixed(1)},${y(v).toFixed(1)}`).join(' '),color=values.at(-1)>=(p.previousClose||values[0])?'#16805a':'#bd4141';
+ return `<svg viewBox="0 0 100 24" role="img" aria-label="${esc(symbol)} intraday prices · ${esc(quoteLabel(p))}"><title>${esc(quoteLabel(p))} · intraday</title><path d="${path}" fill="none" stroke="${color}" stroke-width="1.5" vector-effect="non-scaling-stroke"/><circle cx="${x(to)}" cy="${y(values.at(-1))}" r="1.8" fill="${color}"/></svg>`;
+}

@@ -90,9 +90,12 @@ export function currentQuote(raw,symbol,now=Date.now()){
  const r=raw.chart?.result?.[0],m=r?.meta,t=m?.regularMarketTime*1000;
  if(m?.symbol!==symbol||!(m.regularMarketPrice>0)||!Number.isFinite(m.regularMarketPrice)||!m.currency||!Number.isFinite(t)||t>now+60000)throw Error('Current quote unavailable');
  const session=m.currentTradingPeriod?.regular,start=session?.start*1000,end=session?.end*1000,previous=m.chartPreviousClose;
- return {symbol,latest:m.regularMarketPrice,currency:m.currency,quoteAt:new Date(t).toISOString(),asOf:new Date(t).toISOString().slice(0,10),previousClose:Number.isFinite(previous)&&previous>0?previous:null,marketOpen:Number.isFinite(start)&&Number.isFinite(end)&&now>=start&&now<end,delayed:now>=start&&now<end&&now-t>120000,high:m.regularMarketDayHigh??null,low:m.regularMarketDayLow??null,volume:m.regularMarketVolume??null,source:`https://finance.yahoo.com/quote/${encodeURIComponent(symbol)}/`};
+ const samples=new Map();for(let i=0;i<(r.timestamp||[]).length;i++){const ts=r.timestamp[i]*1000,v=r.indicators?.quote?.[0]?.close?.[i];if(Number.isFinite(ts)&&ts<=t&&ts<=now&&Number.isFinite(v)&&v>0)samples.set(ts,v)}
+ if(samples.size)samples.set(t,m.regularMarketPrice);
+ const intraday=[...samples].sort((a,b)=>a[0]-b[0]).slice(-500);
+ return {symbol,intraday,latest:m.regularMarketPrice,currency:m.currency,quoteAt:new Date(t).toISOString(),asOf:new Date(t).toISOString().slice(0,10),previousClose:Number.isFinite(previous)&&previous>0?previous:null,marketOpen:Number.isFinite(start)&&Number.isFinite(end)&&now>=start&&now<end,delayed:now>=start&&now<end&&now-t>120000,high:m.regularMarketDayHigh??null,low:m.regularMarketDayLow??null,volume:m.regularMarketVolume??null,source:`https://finance.yahoo.com/quote/${encodeURIComponent(symbol)}/`};
 }
-async function quoteFor(env,symbol,refresh=false){return cached(env,'quotes-v1/'+symbol,refresh?0:20000,async()=>currentQuote(await fetchJSON(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1m`),symbol))}
+async function quoteFor(env,symbol,refresh=false){return cached(env,'quotes-v2/'+symbol,refresh?0:20000,async()=>currentQuote(await fetchJSON(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1m`),symbol))}
 const DEFAULT_WATCH=['BE','INTC','NVDA','SPY'];
 export function validateWorkspaceAction(action){
  if(!action||!['watch','rule','deleteRule','readAlerts','researchPriority','followPolitician','importFollows','portfolioSave','portfolioDelete'].includes(action.kind))throw Error('Unknown action');

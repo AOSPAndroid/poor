@@ -1,0 +1,20 @@
+/* Two thin continuous strips, with fixed controls and a swipeable live feed. */
+#homeView.dashboard-home>.favorites-ribbon{display:flex;align-items:stretch;min-height:36px;height:36px;margin:2px 0;border:0;border-radius:0;background:#eaf3ee;box-shadow:none;overflow:hidden}
+#homeView.dashboard-home>.purchases-ribbon{background:#f1f4f2}
+#homeView.dashboard-home>.favorites-ribbon .favorites-ribbon-head{display:flex;flex-wrap:nowrap;align-items:center;justify-content:flex-start;width:auto;flex:none;gap:2px;padding:0 6px;border:0;border-right:1px solid #d1dfd7;border-radius:0;background:inherit}
+#homeView.dashboard-home>.favorites-ribbon .favorites-ribbon-head>b{font-size:10px;width:auto;white-space:nowrap;margin-right:3px}
+#homeView.dashboard-home>.favorites-ribbon .favorites-ribbon-head>small{display:none}
+#homeView.dashboard-home>.favorites-ribbon .favorites-ribbon-head>button{border:0;background:transparent;padding:0 4px;min-width:24px;min-height:32px;height:32px;font-size:12px;line-height:1;margin:0!important}
+#homeView.dashboard-home>.favorites-ribbon .favorites-viewport{flex:1;min-width:0;display:flex;align-items:center}
+#homeView .favorite-quote{flex:0 0 auto;width:auto;min-width:200px;min-height:36px;height:36px;padding:0 13px;gap:7px;white-space:nowrap;background:transparent;border:0;border-right:1px solid #d4e1d9;box-shadow:none;border-radius:0;font-size:11px}
+#homeView .favorite-quote>b,#homeView .favorite-quote>strong{font-size:12px;line-height:1.2}
+#homeView .favorite-quote>small{font-size:10px;white-space:nowrap}
+#homeView .ribbon-spark{display:inline-flex;align-items:center;width:64px;height:24px;flex:none}
+#homeView .ribbon-spark svg{width:64px;height:24px;display:block}
+#homeView .ribbon-chart-empty{font-size:9px;color:#6c7971}
+#homeView .ribbon-warning{font-size:9px;color:#94621c}
+#homeView .purchase-quote{display:flex;align-items:center;gap:7px;width:auto;flex:0 0 auto;height:36px;padding:0 13px;background:transparent;white-space:nowrap;font-size:10px;border:0;border-right:1px solid #d4e1d9}
+#homeView .purchase-quote .purchase-person,#homeView .purchase-quote .purchase-symbol{display:inline-flex;align-items:center;gap:6px;min-height:32px;height:32px;margin:0;padding:0;background:transparent;border:0;font-size:11px;max-width:none;white-space:nowrap}
+#homeView .purchase-amount{font-size:11px}#homeView .purchase-date,#homeView .purchase-rating{font-size:10px}#homeView .purchase-symbol strong{font-size:11px}
+#homeView>.favorites-ribbon .favorite-empty{display:flex;align-items:center;padding:0 10px;font-size:10px;white-space:nowrap;max-width:none;height:36px}
+@media(max-width:700px){#homeView.dashboard-home>.favorites-ribbon .favorites-ribbon-head{padding:0 3px}#homeView.dashboard-home>.favorites-ribbon .favorites-ribbon-head>b{font-size:9px}#homeView .favorite-quote,#homeView .purchase-quote{padding-inline:9px}}

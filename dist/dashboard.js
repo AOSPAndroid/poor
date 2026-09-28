@@ -15,7 +15,7 @@ function renderDashboard(){
  $('#dashboardBreadth').innerHTML=`<div class="dash-breadth-head"><strong>${rows.length?`${adv} rising <span> / </span>${dec} falling`:'Awaiting comparable quotes'}</strong><small>${flat} unchanged · ${rows.length}/${s.total} matched quotes</small></div><div class="dash-breadth-bar" aria-hidden="true"><i style="flex:${adv};background:#258666"></i><i style="flex:${flat};background:#c4cec9"></i><i style="flex:${dec};background:#bd4c58"></i></div><small>Selected stocks + your bookmarks · ${s.latestSession?date(s.latestSession):'Awaiting daily closes'}. Not whole-market breadth.</small>`;
  const extremes=[...rows.filter(x=>x.change>0).slice(0,3),...rows.filter(x=>x.change<0).slice(-3).reverse()];
  $('#dashboardMovers').innerHTML=extremes.map(x=>`<button data-ticker="${esc(x.symbol)}"><b>${esc(x.symbol)}</b><span class="dash-mover-chart">${miniChart(x.p,x.symbol)}</span><strong class="${x.change>=0?'gain':'loss'}">${signed(x.change)}</strong><small>${money(x.p.latest,x.p.currency)} · day</small></button>`).join('')||'<p class="muted">No comparable daily changes available yet.</p>';
- $('#dashboardClock').textContent='Quotes + daily-close charts';
+ $('#dashboardClock').textContent='Quotes + intraday charts';
 }
 (()=>{
  const home=$('#homeView');if(!home)return;
