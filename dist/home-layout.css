@@ -1,4 +1,12 @@
 /* Decisions first, supporting pages in a single shared menu. */
+.purchases-ribbon{margin-top:-4px}.purchases-track,.purchases-group,.purchases-copy{display:flex;width:max-content}
+.purchase-quote{flex:0 0 340px;width:340px;box-sizing:border-box;padding:7px 10px;border-right:1px solid #e7eeea;background:#fff;display:grid;gap:4px;text-align:left}
+.purchase-line{display:flex;align-items:center;gap:7px;min-width:0}.purchase-person{padding:0;font-size:12px;font-weight:650;color:#284638;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.purchase-rating{font-size:10px;color:#63736b;white-space:nowrap}.purchase-symbol{margin-left:auto;padding:3px 6px;background:#edf6f0;color:#196748;border-radius:4px;font-weight:700;font-size:12px;white-space:nowrap}
+.purchase-amount{font-size:12px}.purchase-line>small:not(.purchase-rating){font-size:10px;color:#63736b}.purchase-date{font-size:10px;color:#63736b;line-height:1.4}
+.purchases-ribbon .favorites-ribbon-head b{font-size:12px}.purchases-ribbon #purchasesAll{margin-left:auto}.purchases-ribbon .favorite-empty{white-space:normal;max-width:calc(100vw - 40px)}
+.purchase-quote button:focus-visible{outline:2px solid #198666;outline-offset:2px}
+@media(max-width:700px){.purchase-person,.purchase-symbol{min-height:32px}.purchases-ribbon .favorites-ribbon-head{flex-wrap:wrap;gap:5px}.purchases-ribbon .favorites-ribbon-head>small{font-size:10px}}
 .app-actions{position:relative;margin-left:auto}
 #utilityToggle{display:block;min-height:40px;padding:7px 12px;border:1px solid #d6dfda;border-radius:7px;background:#fff;color:#385447;white-space:nowrap}
 .app-utilities{display:none;position:absolute;right:0;top:calc(100% + 8px);width:260px;max-width:calc(100vw - 24px);max-height:75dvh;overflow:auto;padding:10px;border:1px solid #d6dfda;border-radius:10px;background:#fff;box-shadow:0 12px 36px #18342820;z-index:100}
