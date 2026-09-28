@@ -22,8 +22,7 @@ function renderDashboard(){
  home.classList.add('dashboard-home');
  const heading=document.createElement('div');heading.className='dashboard-heading';heading.innerHTML='<div><span class="dashboard-eyebrow">THE BIG PICTURE</span><h1>Market dashboard</h1></div><div><span id="dashboardClock"></span><button class="secondary" data-view="map">Explore the map ↗</button><button class="primary" data-view="chat">Ask poor ↗</button></div>';home.prepend(heading);
  const market=document.createElement('section');market.className='dashboard-market';market.setAttribute('aria-label','Market overview');heading.after(market);
- const etfs=$('#homeETFs').closest('.home-section');market.append(etfs);etfs.querySelector('h2').textContent='Market pulse';etfs.querySelector('.home-heading>span').textContent='Index & asset ETF proxies · daily closes';
- const tech=document.createElement('section');tech.className='home-section dashboard-tech';tech.innerHTML='<div class="home-heading"><h2>Tech & Nasdaq ETFs</h2><span>Daily closes · 1M charts</span></div><div id="homeTechETFs" class="quote-grid"></div>';market.append(tech);$('#homeTechETFs').innerHTML=HOME_TECH_ETFS.map(quoteCard).join('');
+ const sectorGrid=document.createElement('div');sectorGrid.id='homeSectorGrid';market.append(sectorGrid);
  const conditions=home.querySelector('.home-conditions');market.append(conditions);conditions.querySelector('h2').textContent='Rates, risk & next events';
  const pulse=document.createElement('section');pulse.id='dashboardPulse';pulse.className='dashboard-pulse';pulse.setAttribute('aria-label','Political disclosure activity');market.after(pulse);
  const grid=document.createElement('div');grid.className='dashboard-intelligence';
@@ -32,10 +31,10 @@ function renderDashboard(){
  const movers=document.createElement('section');movers.className='home-section dashboard-movers';movers.innerHTML='<div class="home-heading"><h2>Stocks in motion</h2><button data-view="market">Workspace ↗</button></div><div id="dashboardBreadth"></div><div id="dashboardMovers"></div>';side.append(movers);
  side.append($('#homeSharedBuys').closest('.home-section'));
  const focus=home.querySelector('.home-focus');const body=document.createElement('div');body.className='dashboard-body';grid.before(body);body.append(grid,focus);focus.querySelector('h1').textContent='Research & catalysts';
- // Keep both independently pausable ribbons together, below the market overview.
- const favorites=home.querySelector('.favorites-ribbon:not(.purchases-ribbon)'),purchases=home.querySelector('.purchases-ribbon');pulse.after(favorites);favorites.after(purchases);
- const stocks=$('#homeStocks').closest('.home-section');body.after(stocks);stocks.querySelector('h2').textContent='Equity watch';
- const macro=home.querySelector('.home-macro');stocks.after(macro);macro.open=true;
- home.querySelector('.home-extra>summary').textContent='Unassessed leads & bookmark management';
- renderDashboard();
+ // Put both independently pausable ribbons before all dashboard content.
+ const favorites=home.querySelector('.favorites-ribbon:not(.purchases-ribbon)'),purchases=home.querySelector('.purchases-ribbon');heading.before(favorites,purchases);
+ const stocks=$('#homeStocks').closest('.home-section');stocks.querySelector('h2').textContent='More equities';
+ const macro=home.querySelector('.home-macro');body.after(macro);macro.open=true;
+ home.querySelector('.home-extra>summary').textContent='More prices, unassessed leads & bookmarks';
+ renderHome();
 })();
