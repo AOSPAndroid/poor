@@ -9,4 +9,6 @@ assert.equal((await post({kind:'news',items:[item]})).body.published,0);
 await post({kind:'news',items:[],status:'failed'});
 assert.equal(JSON.parse(memory.get('poor/research/news')).editions.length,1);
 assert.equal(JSON.parse(memory.get('poor/research/news')).status,'Briefing update failed');
+assert.equal((await post({kind:'news',items:Array.from({length:8},(_,i)=>({...item,title:'Distinct '+i,sources:['https://www.sec.gov/news/item-'+i]}))})).body.published,8);
+assert.equal((await post({kind:'news',items:Array(9).fill(item)})).status,400);
 console.log('Passed: fresh sourced news, X-only rejection, unsafe URLs, deduplication and archive preservation on failure.');

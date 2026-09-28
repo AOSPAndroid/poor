@@ -96,7 +96,7 @@ export function validNewsItem(a){
  let independent=false;for(const u of a.sources){try{const x=new URL(u);if(x.protocol!=='https:'||x.username||x.password||!x.hostname.includes('.')||u.length>1500)return false;if(!/(^|\.)(x\.com|twitter\.com)$/.test(x.hostname))independent=true}catch{return false}}return independent;
 }
 async function ingestNews(b,env){
- if(!Array.isArray(b.items)||b.items.length>5||!b.items.every(validNewsItem))return {status:400,body:{error:'Invalid news briefing'}};
+ if(!Array.isArray(b.items)||b.items.length>8||!b.items.every(validNewsItem))return {status:400,body:{error:'Invalid news briefing'}};
  const old=await readResearch(env,'poor/research/news')||{editions:[]},now=new Date().toISOString(),known=new Set(old.editions.flatMap(e=>e.items).map(a=>[...a.sources].sort().join('|'))),items=[];
  for(const a of b.items){const key=[...a.sources].sort().join('|');if(known.has(key))continue;known.add(key);items.push({id:await researchId(key),category:a.category,title:a.title,summary:a.summary,impact:a.impact,risk:a.risk,watch:a.watch,date:a.date,tickers:a.tickers,sources:a.sources,publishedAt:now})}
  const editions=items.length?[{date:today(),publishedAt:now,items},...old.editions].slice(0,30):old.editions;
