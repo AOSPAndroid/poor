@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';import fs from 'node:fs';import vm from 'node:vm';
+const now=Date.now(),today=new Date(now).toISOString().slice(0,10);let score=null;
+const ctx=vm.createContext({read:()=>null,signalData:[],Date,Number,Set,Map,JSON,tickerValid:s=>/^[A-Z]+$/.test(s),disclosedDate:r=>r.disclosed,politicianRating:()=>({score,stale:false}),homeTrackPriority:()=>score>=55?score:0});vm.runInContext(fs.readFileSync('dist/purchase-ribbon.js','utf8'),ctx);
+const row={person:'Example',ticker:'ABC',type:'Purchase',traded:today,disclosed:today,_ribbonScore:60};ctx.snapshot={at:now,rows:[row]};
+assert.equal(vm.runInContext('savedRibbonPurchases(snapshot).length',ctx),1);
+ctx.snapshot.at=now-86400001;assert.equal(vm.runInContext('savedRibbonPurchases(snapshot).length',ctx),0);ctx.snapshot.at=now;
+score=40;assert.equal(vm.runInContext('savedRibbonPurchases(snapshot).length',ctx),0);score=null;
+ctx.snapshot.rows=[{...row,type:'Sale'},{...row,_ribbonScore:54},{...row,quality:'User-provided'},{...row,disclosed:'2099-01-01'}];assert.equal(vm.runInContext('savedRibbonPurchases(snapshot).length',ctx),0);
+score=60;ctx.signalData=[row,row,{...row,type:'Sale'}];assert.equal(vm.runInContext('ribbonPurchases().length',ctx),1);
+console.log('Passed: recent snapshot fallback, expiry, downgraded ratings, future/import/sale exclusion and deduplication.');
