@@ -61,19 +61,25 @@ def order_candidates(candidates):
         if item: chosen.append(item)
     return chosen+[x for x in ordered if x not in chosen]
 
+def decisive_evidence_retrieved(report, finding, allowed, challenge=False):
+    raw=report.get('review' if challenge else 'case',{})
+    a=raw.get('assessment') or {}
+    decisive=a.get('decisiveSources') if isinstance(a,dict) else None
+    retrieved=set(report.get('_diagnostics',{}).get('retrievedSources',[]))
+    excluded={'x.com','twitter.com','polymarket.com','wikipedia.org'}
+    def eligible(u):
+        if not isinstance(u,str):return False
+        host=urlparse(u).hostname or ''
+        return u in allowed and u in finding.get('sources',[]) and u in retrieved and not any(host==d or host.endswith('.'+d) for d in excluded)
+    return bool(isinstance(decisive,list) and decisive and all(eligible(u) for u in decisive))
+
 def screen_case(report, finding, candidate, allowed, challenge=False, today=None):
     """Downgrade unsupported entries; URL membership is provenance, not fact verification."""
     if finding['verdict'] != 'supported' or candidate['type']=='briefing': return finding
     today=today or dt.datetime.now(dt.timezone.utc).date()
     raw=report.get('review' if challenge else 'case',{})
     a=raw.get('assessment') or {}; reasons=[]; entry=finding['entry']
-    decisive=a.get('decisiveSources')
-    retrieved=set(report.get('_diagnostics',{}).get('retrievedSources',[]))
-    excluded={'x.com','twitter.com','polymarket.com','wikipedia.org'}
-    def primary_eligible(u):
-        host=urlparse(u).hostname or ''
-        return not any(host==d or host.endswith('.'+d) for d in excluded)
-    if not isinstance(decisive,list) or not decisive or not all(isinstance(u,str) and u in allowed and u in finding['sources'] and u in retrieved and primary_eligible(u) for u in decisive):
+    if not decisive_evidence_retrieved(report,finding,allowed,challenge):
         reasons.append('Decisive documents are not retrieved and cited.')
     try:
         date=dt.date.fromisoformat(a.get('catalystDate','')); days=(date-today).days

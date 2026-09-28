@@ -1,6 +1,6 @@
 import datetime as dt
 import unittest
-from decision_checks import stock_snapshot, screen_case, order_candidates, contract_rank, guidance, price_condition
+from decision_checks import stock_snapshot, screen_case, order_candidates, contract_rank, guidance, price_condition, decisive_evidence_retrieved
 from research_engine import source_priority
 
 class DecisionTests(unittest.TestCase):
@@ -16,6 +16,13 @@ class DecisionTests(unittest.TestCase):
         r,f,c=self.fixture();r['_diagnostics']['retrievedSources']=[];c['context']['market']={'available':False}
         out=screen_case(r,f,c,{self.url},today=self.today)
         self.assertEqual(out['verdict'],'wait');self.assertIn('Decisive',out['reason']);self.assertIn('Fresh',out['reason'])
+    def test_publication_requires_actual_decisive_retrieval_even_for_wait(self):
+        r,f,c=self.fixture();f['verdict']='wait'
+        self.assertTrue(decisive_evidence_retrieved(r,f,{self.url}))
+        r['_diagnostics']['retrievedSources']=[]
+        self.assertFalse(decisive_evidence_retrieved(r,f,{self.url}))
+        r['_diagnostics']['retrievedSources']=[self.url];f['sources']=[]
+        self.assertFalse(decisive_evidence_retrieved(r,f,{self.url}))
     def test_entry_and_risk_math(self):
         r,f,c=self.fixture()
         out=screen_case(r,f,c,{self.url},today=self.today)

@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 from urllib.parse import urlparse
 from research_engine import PROFILE, run_report
 from research_candidates import select_candidates
-from decision_checks import guidance, stock_snapshot, contract_rank, order_candidates, screen_case, price_condition
+from decision_checks import guidance, stock_snapshot, contract_rank, order_candidates, screen_case, price_condition, decisive_evidence_retrieved
 spec=importlib.util.spec_from_file_location('collector',Path(__file__).with_name('collect-research.py'))
 c=importlib.util.module_from_spec(spec);spec.loader.exec_module(c)
 STATE=PROFILE/'poor-investigations-v1.json'
@@ -185,17 +185,18 @@ def run(monitor_only=False,max_new=3):
                 if not reserve(state,'investigations',today):break
                 candidate=market_context(candidate,base)
                 key=candidate['type']+':'+candidate['target'];state['seen'][key]={'fingerprint':candidate['fingerprint'],'anchor':candidate['anchor'],'date':today,'caseId':candidate['id'],'ok':False};save(state)
-                ok=False;report={}
+                ok=False;report={};allowed=set();evidence_ready=False
                 try:
                     report,allowed=run_report(prompt_for(candidate),allowed_sources(candidate),seconds=45,max_pages=4,writing_seconds=60,verified_only=True)
                     candidate=market_context(candidate,base)
                     finding=screen_case(report,validate_case(report,allowed),candidate,allowed);ok=finding['verdict']!='unverified'
-                    if finding['verdict'] in ('supported','wait'):
+                    evidence_ready=decisive_evidence_retrieved(report,finding,allowed)
+                    if evidence_ready and finding['verdict'] in ('supported','wait'):
                         try:publish_news(report,candidate,finding,base,token)
                         except Exception:print('Decision brief retained; news format or date did not qualify')
                 except Exception:
                     finding={'verdict':'unverified','title':'Could not verify '+candidate['target'],'whyNow':'A new source record, changed contract or scheduled news scan prompted a check.','entry':'No entry justified by this research attempt.','risk':'Current evidence could not be verified.','nextCheck':'Retry on the next eligible daily run or after a material change.','reason':'The research attempt did not return a complete source-checked brief. This is not a rejection of the investment.','sources':[]}
-                item={k:candidate[k] for k in ('id','type','target','fingerprint')};item.update(finding,phase='finding')
+                item={k:candidate[k] for k in ('id','type','target','fingerprint')};item.update(finding,phase='finding',decisiveEvidenceRetrieved=evidence_ready)
                 if candidate['type']=='contract':item['rules']=candidate['context']['rules']
                 assessment=report.get('case',{}).get('assessment',{})
                 if isinstance(assessment,dict) and re.fullmatch(r'\d{4}-\d{2}-\d{2}',str(assessment.get('catalystDate',''))):

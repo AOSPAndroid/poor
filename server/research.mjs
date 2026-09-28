@@ -256,6 +256,7 @@ async function ingestInvestigation(b,env){
  const finding=x.phase==='challenge'?await readResearch(env,'poor/research/investigations/'+x.id+'/finding'):null;
  if(x.phase==='challenge'&&(!finding||finding.target!==x.target||finding.fingerprint!==x.fingerprint||finding.rules!==x.rules))return {status:400,body:{error:'Challenge must match the original case'}};
  const item=Object.fromEntries(['id','type','target','phase','verdict','title','whyNow','entry','risk','nextCheck','reason','sources','fingerprint','rules','attempt'].filter(k=>x[k]!==undefined).map(k=>[k,x[k]]));item.publishedAt=new Date().toISOString();
+ item.decisiveEvidenceRetrieved=x.decisiveEvidenceRetrieved===true;
  await env.BUCKET.put(key,JSON.stringify(item));
  const index=await readResearch(env,'poor/research/activity-index')||{items:[]};index.items=[item,...index.items.filter(i=>i.id!==item.id||i.phase!==item.phase||i.attempt!==item.attempt)].slice(0,150);await env.BUCKET.put('poor/research/activity-index',JSON.stringify(index));
  return {status:200,body:{ok:true}};

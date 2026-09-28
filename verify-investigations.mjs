@@ -4,10 +4,12 @@ const storage=new Map(),env={RESEARCH_INGEST_TOKEN:'test-only',BUCKET:{get:async
 const item={id:'a'.repeat(24),fingerprint:'b'.repeat(64),type:'contract',target:'42',phase:'finding',verdict:'wait',title:'Test',whyNow:'Timing',entry:'Wait',risk:'Risk',nextCheck:'Next',reason:'Reason',sources:['https://www.sec.gov/test'],rules:'Exact rules'};
 const send=(x,token='test-only')=>researchIngest(new Request('https://poor.test/api/research/ingest',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({kind:'investigation',item:x})}),env);
 assert.equal((await send(item,'wrong')).status,401);assert(validInvestigation({item}));assert(!validInvestigation({item:{...item,sources:['https://x.com/post']}}));
-assert.equal((await send(item)).status,200);assert((await send({...item,title:'Cannot rewrite'})).body.duplicate);
+assert.equal((await send({...item,decisiveEvidenceRetrieved:true})).status,200);assert((await send({...item,title:'Cannot rewrite'})).body.duplicate);
 assert.equal((await send({...item,phase:'challenge',rules:'Different rules'})).status,400);
 assert.equal((await send({...item,phase:'challenge',attempt:'c'.repeat(24)})).status,200);
 assert.equal((await send({...item,phase:'challenge',attempt:'d'.repeat(24),verdict:'rejected'})).status,200);
 const feed=await researchRoute(new URL('https://poor.test/api/research/activity'),env);assert.equal(feed.items.length,3);assert.equal(feed.items.at(-1).title,'Test');assert.equal(feed.items[0].verdict,'rejected');
 assert.doesNotThrow(()=>validateWorkspaceAction({kind:'researchPriority',enabled:true}));assert.throws(()=>validateWorkspaceAction({kind:'researchPriority',enabled:'yes'}));
-console.log('Investigation auth, citations, immutable history, rule matching, repeat challenges and opt-in validation passed.');
+assert.equal(feed.items.at(-1).decisiveEvidenceRetrieved,true);
+assert.equal(feed.items[0].decisiveEvidenceRetrieved,false);
+console.log('Investigation auth, citations, immutable history, evidence flags, rule matching, repeat challenges and opt-in validation passed.');
