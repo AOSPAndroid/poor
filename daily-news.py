@@ -34,7 +34,7 @@ def run(refresh=False):
         cli=c.PROFILE.parents[1]/'bin/hermes.exe'
         import yaml
         model=yaml.safe_load((c.PROFILE/'config.yaml').read_text(encoding='utf-8')).get('model',{}).get('default','grok-4.7')
-        p=subprocess.run([str(cli),'--profile','poor','chat','--safe-mode','--provider','xai-oauth','--model',model,'--oneshot','-Q','--query-file','-','--max-turns','18','--run-budget','360','--toolsets','web,x_search'],input=prompt,text=True,capture_output=True,timeout=420,encoding='utf-8',errors='replace',creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+        p=subprocess.run([str(cli),'--profile','poor','chat','--ignore-user-config','--ignore-rules','--provider','xai-oauth','--model',model,'--oneshot','-Q','--query-file','-','--max-turns','18','--run-budget','360','--toolsets','web,x_search'],input=prompt,text=True,capture_output=True,timeout=420,encoding='utf-8',errors='replace',creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
         if p.returncode:raise ValueError('Agent unavailable')
         report=json.loads(p.stdout[p.stdout.find('{'):p.stdout.rfind('}')+1])
         session=re.search(r'session_id:\s*(\d{8}_\d{6}_[a-z0-9]+)',p.stdout+'\n'+p.stderr)
