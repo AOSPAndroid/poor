@@ -55,3 +55,5 @@
 .favorites-ribbon-head>button[aria-pressed="true"]{background:#e7f1eb;border-color:#b8d1c3}
 .favorites-ribbon-head>button[hidden]{display:none}
 @media(max-width:700px){.favorites-ribbon .favorites-ribbon-head{column-gap:4px;padding:7px 8px}.favorites-ribbon-head>button{min-height:44px;padding:6px;font-size:11px}.purchases-ribbon .favorites-ribbon-head>small{font-size:9px}}
+
+.map-heading{flex-wrap:wrap;gap:8px}.map-heading h1{margin-right:auto}.map-heading #explainMap{min-height:40px;padding:8px 12px;border-radius:6px}.stock-actions #openStockMap{font-weight:650}

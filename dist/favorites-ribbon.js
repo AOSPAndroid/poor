@@ -2,7 +2,7 @@
 let favoritesSignature='',favoritesPaused=read('poor-favorites-paused',false),favoritesHoldUntil=0,favoritesHover=false,favoritesFrame=0,favoritesRemainder=0;
 function favoriteQuote(symbol,copy=false){
  const p=PRICES[symbol],delta=p?.latest>0&&p?.previousClose>0?(p.latest/p.previousClose-1)*100:null,dir=delta===null?'':delta>0?'▲':delta<0?'▼':'→';
- return `<button class="favorite-quote" data-ticker="${esc(symbol)}" ${copy?'tabindex="-1"':''} aria-label="Open ${esc(symbol)} terminal" title="${esc(p?.name||HOME_NAMES[symbol]||symbol)}"><span class="favorite-symbol"><b>${esc(symbol)}</b><small>${p?date(p.asOf)+(p.stale?' · stale':''):'Loading price'}</small></span><span class="favorite-price"><b>${p?.latest>0?money(p.latest,p.currency):'—'}</b><small class="${delta===null?'muted':delta>=0?'gain':'loss'}">${dir} ${delta===null?'Change unavailable':signed(delta)+' day'}</small></span><span class="favorite-spark" aria-hidden="true">${miniChart(p,symbol)}</span></button>`;
+ return `<button class="favorite-quote" data-ticker="${esc(symbol)}" ${copy?'tabindex="-1"':''} aria-label="Open ${esc(symbol)} workspace" title="${esc(p?.name||HOME_NAMES[symbol]||symbol)}"><span class="favorite-symbol"><b>${esc(symbol)}</b><small>${p?date(p.asOf)+(p.stale?' · stale':''):'Loading price'}</small></span><span class="favorite-price"><b>${p?.latest>0?money(p.latest,p.currency):'—'}</b><small class="${delta===null?'muted':delta>=0?'gain':'loss'}">${dir} ${delta===null?'Change unavailable':signed(delta)+' day'}</small></span><span class="favorite-spark" aria-hidden="true">${miniChart(p,symbol)}</span></button>`;
 }
 function renderFavoritesRibbon(force=false){
  const el=$('#favoritesTrack'),viewport=$('#favoritesViewport');if(!el)return;
