@@ -69,7 +69,7 @@ def run(refresh=False):
                     dates=sorted(q.get('closes',{}));closes=q.get('closes',{});move=(q['latest']/closes[dates[-21]]-1)*100 if len(dates)>20 and closes[dates[-21]]>0 else None
                     context['market'].append({'ticker':ticker,'latestClose':q['latest'],'asOf':q['asOf'],'twentySessionPriceChangePct':move,'source':q.get('source')})
                     if q.get('source'):initial_sources.add(q['source'])
-        except Exception:pass
+        except Exception as exc:print('Research stage failed: '+type(exc).__name__)
         if fingerprint and fingerprint==old.get('fingerprint') and not refresh:raise NoResearchChanges()
         prompt=('Produce up to 2 decision-useful research theses for poor. Today is '+str(today)+'. Do not write article summaries. Each thesis must connect at least TWO independently supported facts from TWO DIFFERENT evidence families: political disclosure, corporate insider filing, policy, contract, company catalyst, or market pricing. At least one must be political or policy and one cited document must be an original government/SEC filing. '
           'Prioritize supplied candidateConnections with fresh public catalysts even when the purchase is old. Cached map records are leads to verify, not automatically proven causal links. Check later sales and counterevidence. Reuse an existing thesis unless the evidence materially changes. '
@@ -79,15 +79,11 @@ def run(refresh=False):
           'The ENTIRE reader-facing article must be a TLDR, not a long article with a TLDR section. Maximum 100 words TOTAL across title, tldr, watch, invalidation and horizon. Title under 12 words. tldr is two short sentences that connect the facts, why now and the key pricing caveat. watch and invalidation are one short sentence each. Horizon is just 2-20 trading days or 20-60 trading days. The other schema fields are internal evidence checks, not extra article sections. '
           'Return ONLY JSON {"articles":[{"title":"concise thesis","tldr":"the actionable connection in two sentences, conditional not a buy instruction","why":"causal mechanism and why now; clearly an inference","risk":"strongest alternative explanation","watch":"specific public confirmation/catalyst","pricedIn":"dated price context and remaining uncertainty; unknown if unavailable","invalidation":"observable condition that breaks the thesis","horizon":"2-20 or 20-60 trading days and rationale","evidence":[{"kind":"political|insider|policy|contract|company|market","fact":"precise sourced fact, not inference","date":"YYYY-MM-DD or null","url":"exact source URL"}],"tickers":["INTC"],"published":"newest source publication YYYY-MM-DD","sources":["all evidence URLs"]}]}. Title max 160 characters; all other text fields max 800; 2-4 facts, 2-4 sources. Paraphrase. '
           'Loaded data: '+json.dumps(context)+'. Previous stories (only revisit with a substantively new connection): '+json.dumps(recent))
-        cli=c.PROFILE.parents[1]/'bin/hermes.exe'
-        p=subprocess.run([str(cli),'--profile','poor','chat','--oneshot','-Q','--query-file','-','--max-turns','8','--run-budget','180','--toolsets','web,x_search'],input=prompt,text=True,capture_output=True,timeout=300,encoding='utf-8',errors='replace',creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
-        if p.returncode:raise ValueError('Agent failed')
-        start=p.stdout.find('{');end=p.stdout.rfind('}');report=json.loads(p.stdout[start:end+1])
-        session=re.search(r'session_id:\s*(\d{8}_\d{6}_[a-z0-9]+)',p.stdout+'\n'+p.stderr)
-        allowed=c.cited_urls(session.group(1) if session else None,initial_sources)
+        from research_engine import run_report
+        report,allowed=run_report(prompt,initial_sources)
         articles=validate_articles(report,allowed,known,today)
         status='Published '+str(len(articles))+' new briefs' if articles else 'No new connection met the evidence and thesis requirements today'
-    except Exception:pass
+    except Exception as exc:print('Research stage failed: '+type(exc).__name__)
     result=c.request(base,'/api/research/ingest',{'kind':'daily','date':str(today),'articles':articles,'status':status},token)
     STATE.write_text(json.dumps({'date':str(today),'status':status,'published':result.get('published',0),'finishedAt':time.time(),'fingerprint':fingerprint if not status.startswith('Daily research failed') else old.get('fingerprint')},indent=2))
     print(status)

@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+const context={read:()=>null,validDate:d=>/^\d{4}-\d{2}-\d{2}$/.test(d)};
+vm.createContext(context);vm.runInContext(fs.readFileSync('dist/swing.js','utf8')+'\n'+fs.readFileSync('dist/decision-desk.js','utf8'),context);
+const now=Date.parse('2026-09-28'),closes={};for(let i=0;i<22;i++)closes[new Date(now-(21-i)*86400000).toISOString().slice(0,10)]=100+i;
+const p={closes,asOf:'2026-09-28',latest:121};
+assert.equal(context.swingDecision(p,p,now).state,'Above prior 20-session closing high');
+assert.equal(context.swingDecision({...p,stale:true},p,now).state,'Price check unavailable');
+assert.equal(context.swingDecision({...p,asOf:'2026-10-01'},p,now).state,'Price check unavailable');
+assert.equal(context.swingDecision({...p,closes:{'2026-09-28':121}},p,now).state,'Price check unavailable');
+assert.equal(context.swingDecision(p,{...p,stale:true},now).reason,'S&P 500 comparison missing');
+console.log('Decision desk checks passed: closing-high confirmation, stale/future/short-history rejection and missing benchmark.');

@@ -33,7 +33,7 @@ async function pmIngest(request,env){
  const key='poor/predictions/insights-v1',checkedAt=new Date().toISOString();
  const items=body.items.map(x=>({marketId:x.marketId,rules:x.rules,thesis:x.thesis,against:x.against,pricedIn:x.pricedIn,watch:x.watch,sources:x.sources,createdAt:checkedAt}));
  const obj=await env.BUCKET.get(key),old=obj?await obj.json():{items:[]};
- await env.BUCKET.put(key,JSON.stringify({checkedAt,status:body.status==='complete'?'Checked':'Research unavailable',items:[...items,...old.items.filter(x=>!items.some(i=>i.marketId===x.marketId))].slice(0,30)}));return {status:200,body:{published:items.length}};
+ await env.BUCKET.put(key,JSON.stringify({checkedAt,status:body.status==='complete'?'Checked':body.reason==='busy'?'Research service busy; next daily run will retry':'Research unavailable',items:[...items,...old.items.filter(x=>!items.some(i=>i.marketId===x.marketId))].slice(0,30)}));return {status:200,body:{published:items.length}};
 }
 export async function predictionsRoute(request,env,cached){
  const url=new URL(request.url),path=url.pathname;

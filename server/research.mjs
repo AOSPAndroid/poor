@@ -100,7 +100,7 @@ async function ingestNews(b,env){
  const old=await readResearch(env,'poor/research/news')||{editions:[]},now=new Date().toISOString(),known=new Set(old.editions.flatMap(e=>e.items).map(a=>[...a.sources].sort().join('|'))),items=[];
  for(const a of b.items){const key=[...a.sources].sort().join('|');if(known.has(key))continue;known.add(key);items.push({id:await researchId(key),category:a.category,title:a.title,summary:a.summary,impact:a.impact,risk:a.risk,watch:a.watch,date:a.date,tickers:a.tickers,sources:a.sources,publishedAt:now})}
  const editions=items.length?[{date:today(),publishedAt:now,items},...old.editions].slice(0,30):old.editions;
- await env.BUCKET.put('poor/research/news',JSON.stringify({editions,lastAttempt:now,status:b.status==='failed'?'Briefing update failed':items.length?'Updated':'No publishable items from this search'}));return {status:200,body:{ok:true,published:items.length}};
+ await env.BUCKET.put('poor/research/news',JSON.stringify({editions,lastAttempt:now,status:b.status==='failed'?(b.reason==='busy'?'Research service busy; next daily run will retry':'Briefing update failed'):items.length?'Updated':'No publishable items from this search'}));return {status:200,body:{ok:true,published:items.length}};
 }
 export async function researchIngest(request,env){
  const token=request.headers.get('Authorization');if(!env.RESEARCH_INGEST_TOKEN||token!=='Bearer '+env.RESEARCH_INGEST_TOKEN)return {status:401,body:{error:'Unauthorized'}};
