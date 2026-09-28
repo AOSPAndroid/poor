@@ -47,6 +47,7 @@ function renderHomeNews(){
  el.innerHTML=cards.length?cards.slice(0,3).join('')+(cards.length>3?`<details class="home-more-news"><summary>More news · ${cards.length-3} items</summary><div>${cards.slice(3).join('')}</div></details>`:''):'<p class="muted">No briefing is available yet. This is a coverage gap, not a signal that markets are quiet.</p>';
 }
 function renderHomeInsights(){
+ if(typeof renderDashboard==='function')renderDashboard();
  renderHomeNews();
  if(!$('#homeSetups'))return;
  const rows=homePublicRows(),articles=(homeArchive?.editions||[]).flatMap(e=>e.articles||[]).filter(a=>a.format===2),candidates=homeCandidates(rows,articles,PRICES),qualified=homeResearchError?[]:candidates.filter(x=>x.qualified&&x.rating>=55),leads=candidates.filter(x=>homeResearchError||!x.qualified).slice(0,3);

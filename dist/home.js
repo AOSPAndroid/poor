@@ -31,7 +31,7 @@ function renderHome(){if(typeof renderPurchasesRibbon==='function')renderPurchas
  $('#homeETFs').innerHTML=HOME_ETFS.map(quoteCard).join('');$('#homeStocks').innerHTML=HOME_STOCKS.map(quoteCard).join('');
  $('#homeBookmarks').innerHTML=workspaceState.symbols.map(s=>`<span class="favorite-chip"><button data-ticker="${esc(s)}">${esc(s)} <b>${PRICES[s]?money(PRICES[s].latest,PRICES[s].currency):'—'}</b></button><button data-bookmark="${esc(s)}" aria-label="Remove ${esc(s)} bookmark" ${workspaceBusy?'disabled':''}>×</button></span>`).join('')||'<span class="muted">Tap a star to bookmark a stock.</span>';renderAccount();
 }
-async function refreshHome(){if(homeBusy)return;homeBusy=true;renderHome();try{for(const symbols of [workspaceState.symbols,HOME_ETFS,HOME_STOCKS,...(typeof CONTEXT_ASSETS!=='undefined'?[CONTEXT_ASSETS.map(a=>a[0])]:[])]){await loadMarketPrices(symbols);renderHome()}}finally{homeBusy=false}}
+async function refreshHome(){if(homeBusy)return;homeBusy=true;renderHome();try{for(const symbols of [HOME_ETFS,workspaceState.symbols,HOME_STOCKS,...(typeof CONTEXT_ASSETS!=='undefined'?[CONTEXT_ASSETS.map(a=>a[0])]:[])]){await loadMarketPrices(symbols);renderHome()}}finally{homeBusy=false}}
 if(typeof window!=='undefined'){
  document.addEventListener('click',async e=>{const b=e.target.closest('[data-bookmark]');if(!b||workspaceBusy||!workspaceReady)return;const symbol=b.dataset.bookmark;await workspaceAction({kind:'watch',symbol,enabled:!workspaceState.symbols.includes(symbol)});renderHome()});
  $('#homeTickerSearch').onsubmit=e=>{e.preventDefault();openStock($('#homeTickerInput').value)};
