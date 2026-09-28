@@ -45,7 +45,7 @@ async function refreshLive(){
    liveStatus[name]={...result,providerStale:!!value&&(value.providerCurrent===false||!value.sourceUpdatedAt||Date.now()-Date.parse(value.sourceUpdatedAt)>48*3600000)};
   }catch{liveStatus[name]={...liveStatus[name],error:true,stale:true}}
  }));
- rebuildLiveData();if(typeof refreshPurchaseRatings==='function')refreshPurchaseRatings();if(typeof renderTerminal==='function')renderTerminal();liveBusy=false;liveStatusView();await refreshPrices();
+ rebuildLiveData();if(typeof refreshAccountability==='function')refreshAccountability();if(typeof refreshPurchaseRatings==='function')refreshPurchaseRatings();if(typeof renderTerminal==='function')renderTerminal();liveBusy=false;liveStatusView();await refreshPrices();
 }
 if(typeof window!=='undefined'&&typeof fetch==='function'){
  refreshLive();

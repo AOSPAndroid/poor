@@ -11,6 +11,7 @@ assert.equal(feed([{...base,verdict:'unverified'}]).research.length,0);
 assert.equal(feed([{...base,decisiveEvidenceRetrieved:false}]).research.length,0);
 assert.equal(feed([base]).home.length,0); // No second review.
 assert.equal(feed([base,review]).home.length,1);
+assert.equal(feed([base,{...review,decisiveEvidenceRetrieved:false}]).home.length,0); // An unverified second opinion cannot promote a trade.
 assert.equal(feed([base,{...review,verdict:'wait'}]).home.length,0);
 assert.equal(feed([base,{...review,verdict:'rejected'}]).research.length,1); // Keep counterevidence.
 assert.equal(feed([{...base,type:'briefing'}]).home.length,1);

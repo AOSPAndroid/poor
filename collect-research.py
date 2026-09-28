@@ -137,6 +137,7 @@ def run(research=False,local=False):
     measured=[s for s in measured if isinstance(s,str) and re.fullmatch(r'[A-Z][A-Z0-9.-]{0,11}',s)]
     for offset in range(0,len(measured),5):get('/api/prices?symbols='+','.join(measured[offset:offset+5]+['SPY']))
     get('/api/research/scorecard')
+    get('/api/research/investigation-scorecard')
     get('/api/feed/congress');treasury=get('/api/research/treasury');get('/api/prices?symbols=SPY,QQQ,TLT,HYG,LQD,UUP')
     if not treasury and not local and config.get('token'):
         try:

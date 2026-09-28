@@ -61,6 +61,10 @@ export async function researchRoute(url,env,cache,priceLoader){const path=url.pa
  if(path==='/api/research/politics'){const feed=await readResearch(env,'pif/v1/congress-universe-v4');return {value:{rows:mapPoliticalRows(feed),coverage:'Curated source records plus loaded feed; original provenance retained'}};}
  if(path==='/api/research/daily')return dailyArchive(env);
  if(path==='/api/research/activity')return {items:(await readResearch(env,'poor/research/activity-index'))?.items||[],status:await readResearch(env,'poor/research/pipeline-status')};
+ if(path==='/api/research/investigation-scorecard')return cache(env,'investigation-scorecard-v1',15*60000,()=>investigationScorecard(env));
+ if(path==='/api/research/coverage')return coverageReport(env);
+ if(path==='/api/research/ledger')return investigationLedger(env,url.searchParams.get('cursor'));
+ if(path==='/api/research/investigation-result')return investigationResult(env,url.searchParams.get('id'));
  if(path==='/api/research/scorecard')return cache(env,'research-scorecard-v1',15*60000,()=>researchScorecard(env,priceLoader));
  if(path==='/api/research/performance')return articlePerformance(env,url.searchParams.get('id'),priceLoader);
  const symbol=url.searchParams.get('symbol');if(!/^[A-Z][A-Z0-9.-]{0,11}$/.test(symbol||''))return {error:'Invalid ticker'};
@@ -257,7 +261,65 @@ async function ingestInvestigation(b,env){
  if(x.phase==='challenge'&&(!finding||finding.target!==x.target||finding.fingerprint!==x.fingerprint||finding.rules!==x.rules))return {status:400,body:{error:'Challenge must match the original case'}};
  const item=Object.fromEntries(['id','type','target','phase','verdict','title','whyNow','entry','risk','nextCheck','reason','sources','fingerprint','rules','attempt'].filter(k=>x[k]!==undefined).map(k=>[k,x[k]]));item.publishedAt=new Date().toISOString();
  item.decisiveEvidenceRetrieved=x.decisiveEvidenceRetrieved===true;
+ if(x.phase==='finding'){
+  item.protocol='investigations-v1';
+  if(x.type==='stock')item.measurement={version:1,symbol:x.target,direction:x.verdict==='supported'&&item.decisiveEvidenceRetrieved?'long':'watch',registeredAt:item.publishedAt};
+  if(x.type==='contract')item.marketAtPublication=await captureContract(x.target,x.rules);
+ }
  await env.BUCKET.put(key,JSON.stringify(item));
  const index=await readResearch(env,'poor/research/activity-index')||{items:[]};index.items=[item,...index.items.filter(i=>i.id!==item.id||i.phase!==item.phase||i.attempt!==item.attempt)].slice(0,150);await env.BUCKET.put('poor/research/activity-index',JSON.stringify(index));
  return {status:200,body:{ok:true}};
+}
+
+// Immutable findings are authoritative; the short activity index is only a recent-feed cache.
+export async function investigationLedger(env,cursor){
+ if(cursor&&cursor.length>2048)return {error:'Invalid archive cursor'};
+ if(!env.BUCKET.list)return {items:(await readResearch(env,'poor/research/activity-index'))?.items||[],cursor:null,partial:true};
+ const page=await env.BUCKET.list({prefix:'poor/research/investigations/',limit:50,...(cursor?{cursor}:{})});
+ const items=(await Promise.all(page.objects.map(o=>readResearch(env,o.key)))).filter(Boolean).sort((a,b)=>b.publishedAt.localeCompare(a.publishedAt));
+ return {items,cursor:page.truncated?page.cursor:null,order:'Archive pages; dates sorted within each page',partial:false};
+}
+export async function coverageReport(env){
+ const [feed,collector,pipeline]=await Promise.all(['pif/v1/congress-universe-v4','poor/research/collector','poor/research/pipeline-status'].map(k=>readResearch(env,k)));
+ const rows=mapPoliticalRows(feed),dated=rows.filter(r=>day(r.disclosed||r.filed)),dates=dated.map(r=>r.disclosed||r.filed).sort(),linked=rows.filter(r=>/^https:\/\//.test(r.source||''));
+ return {checkedAt:feed?.checkedAt?new Date(feed.checkedAt).toISOString():null,stale:!feed?.checkedAt||!!feed.error||Date.now()-feed.checkedAt>6*RHOUR||feed?.value?.providerCurrent===false||!feed?.value?.sourceUpdatedAt||Date.now()-Date.parse(feed.value.sourceUpdatedAt)>48*RHOUR,rows:rows.length,people:new Set(rows.map(r=>r.person)).size,linked:linked.length,dated:dated.length,first:dates[0]||null,last:dates.at(-1)||null,skipped:feed?.value?.skipped??null,partial:true,coverage:feed?.value?.coverage||'Only saved curated records are available; live coverage unknown.',collectorAt:collector?.lastRun||null,pipelineAt:pipeline?.checkedAt||null,method:'Loaded coverage, not all filings or all holdings. Source links can be aggregators; inspect the original filing. Missing dates, exclusions and reporting delays limit what can be copied.'};
+}
+export async function captureContract(id,rules,fetcher=fetch){
+ const get=async url=>{const r=await fetcher(url,{headers:{Accept:'application/json'},signal:AbortSignal.timeout(8000)});if(!r.ok)throw Error('Unavailable');return r.json()};
+ try{
+  const m=await get('https://gamma-api.polymarket.com/markets/'+id);
+  if(String(m.id)!==id||String(m.description||'')!==rules)return {state:'Rules changed or unavailable',checkedAt:new Date().toISOString()};
+  const array=x=>Array.isArray(x)?x:JSON.parse(x||'[]'),labels=array(m.outcomes),tokens=array(m.clobTokenIds),prices=array(m.outcomePrices);
+  const outcomes=await Promise.all(labels.slice(0,2).map(async(label,i)=>{
+   const raw=prices[i]===null||prices[i]===undefined?NaN:Number(prices[i]);const o={label:String(label),price:Number.isFinite(raw)&&raw>=0&&raw<=1?raw:null,bid:null,ask:null,spread:null};
+   if(!/^\d{1,100}$/.test(String(tokens[i])))return o;
+   try{const b=await get('https://clob.polymarket.com/book?token_id='+tokens[i]),at=Number(b.timestamp);
+    if(String(b.asset_id)!==String(tokens[i])||!Number.isFinite(at)||Date.now()-at>120000||at>Date.now()+30000)return o;
+    const levels=a=>(a||[]).filter(x=>Number(x.size)>0).map(x=>Number(x.price)).filter(n=>Number.isFinite(n)&&n>0&&n<=1),bids=levels(b.bids),asks=levels(b.asks);
+    o.bid=bids.length?Math.max(...bids):null;o.ask=asks.length?Math.min(...asks):null;o.spread=o.ask!==null&&o.bid!==null&&o.ask>=o.bid?o.ask-o.bid:null;o.bookAt=new Date(at).toISOString();
+   }catch{}return o;
+  }));
+  return {state:'Observed',checkedAt:new Date().toISOString(),rules,resolutionSource:m.resolutionSource||null,end:m.endDate||null,closed:m.closed===true,resolved:m.umaResolutionStatus==='resolved',feesEnabled:m.feesEnabled===true,outcomes,url:'https://polymarket.com/market/'+encodeURIComponent(m.slug||id)};
+ }catch{return {state:'Quote unavailable',checkedAt:new Date().toISOString()}}
+}
+export async function investigationResult(env,id){
+ if(!/^[a-f0-9]{24}$/.test(id||''))return {error:'Invalid investigation'};
+ const a=await readResearch(env,'poor/research/investigations/'+id+'/finding');if(!a)return {error:'Finding not found'};
+ if(a.type==='contract'){
+  const old=a.marketAtPublication,current=await captureContract(a.target,a.rules);
+  return {id,type:a.type,originalVerdict:a.verdict,publishedAt:a.publishedAt,original:{rules:a.rules,...(old||{state:'No publication quote was recorded'})},current,method:'Real provider odds and two-sided quotes. Movement is not profit. No position, fill or settlement payout is inferred; fees and depth affect execution. Original rules and quotes remain unchanged.'};
+ }
+ if(a.type!=='stock')return {id,state:'News briefing; no stock outcome registered'};
+ if(!a.measurement)return {id,state:'Legacy finding; no prospective result registered'};
+ const key='poor/research/investigation-outcomes-v1/'+id,saved=await readResearch(env,key);if(saved)return saved;
+ const quote=async s=>{const q=await readResearch(env,'pif/v1/prices-v4/'+s);return q?{...q,stale:!!q.error||!q.checkedAt||Date.now()-q.checkedAt>36*RHOUR}:null};
+ const [stock,benchmark]=await Promise.all([quote(a.target),quote('SPY')]);
+ const result={...evaluateResearchOutcome(a,stock,benchmark),originalVerdict:a.verdict,method:'First close after publication UTC date → 20 S&P 500 proxy sessions. 10 bps per side; stress 25 bps per side. Same-date SPY price returns, excluding dividends and taxes. Hypothetical long-stock observation, not a filled trade; textual entry triggers and intraday stops are not simulated. Every originally supported, evidence-backed finding stays included, even if later rejected.'};
+ if(result.state==='Completed')await env.BUCKET.put(key,JSON.stringify(result));return result;
+}
+
+async function investigationScorecard(env){
+ const items=(await readResearch(env,'poor/research/activity-index'))?.items||[],findings=items.filter(a=>a.phase==='finding'&&a.type==='stock'&&a.measurement?.direction==='long');
+ const rows=[];for(const a of findings)rows.push(await investigationResult(env,a.id));
+ return {rows,summary:summarizeResearchOutcomes(rows),registered:findings.length,method:'Recent activity window only (up to 150 findings and reviews). Every originally supported stock case in this window is counted, including later rejections. Full permanent history is available in the archive. Observations can overlap and are not independent trades or portfolio returns. Edge not established.'};
 }
