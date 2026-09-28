@@ -99,7 +99,7 @@ async function loadMarketPrices(symbols){
    PRICES[s]={...r.value,stale:!!r.stale,checkedAt:r.checkedAt};
    if(!r.stale&&!r.error)marketHistorySuccess.set(s,Date.now());
    marketHistoryState.set(s,Object.keys(r.value.closes).length>=10?'ready':'error');
-  }catch{marketHistoryState.set(s,'error')}finally{marketHistoryRequests.delete(s);if(view==='market'&&s===marketSymbol)renderTerminal();scheduleHomePricePaint()}})();
+  }catch{marketHistoryState.set(s,'error')}finally{marketHistoryRequests.delete(s);if(view==='market'&&s===marketSymbol)renderTerminal();scheduleHomePricePaint();if(view==='portfolio'&&typeof renderPersonal==='function')renderPersonal()}})();
   marketHistoryRequests.set(s,request);return request;
  }));}
  if(typeof refreshRatingBadges==='function')refreshRatingBadges();
@@ -129,7 +129,7 @@ async function performWorkspaceAction(action){
    persist('poor-follows-legacy-owner',scope);
   }
   if(!workspaceReady&&action)result=await workspaceRequest(action);
-  workspaceState=result;workspaceReady=true;
+  workspaceState=result;workspaceReady=true;if(typeof renderPersonal==='function')renderPersonal();
   follows=new Set(result.followedPoliticians||[]);
   persist('poor-follows:'+scope,[...follows]);
   // The legacy key remains a guest/sign-in migration backup, owned by this identity.

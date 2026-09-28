@@ -1,3 +1,4 @@
+import {personalValidate,personalPositions} from './holdings.mjs';
 const HOUR=3600000, inflight=new Map();
 const FEED_URL='https://congressinfor-production.up.railway.app/trades?limit=500&offset=0';
 const CABINET_URL='https://open-cabinet.org/data/all-transactions.csv';
@@ -87,7 +88,10 @@ export function newsRows(xml){
 async function pricesFor(env,symbol){return cached(env,'prices-v4/'+symbol,15*60000,async()=>chartPrices(await fetchJSON(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=5y&interval=1d`),symbol))}
 const DEFAULT_WATCH=['BE','INTC','NVDA','SPY'];
 export function validateWorkspaceAction(action){
- if(!action||!['watch','rule','deleteRule','readAlerts','researchPriority','followPolitician','importFollows'].includes(action.kind))throw Error('Unknown action');
+ if(!action||!['watch','rule','deleteRule','readAlerts','researchPriority','followPolitician','importFollows','portfolioSave','portfolioDelete'].includes(action.kind))throw Error('Unknown action');
+ if(action.kind==='portfolioSave')personalValidate(action.transaction);
+ if(['portfolioSave','portfolioDelete'].includes(action.kind)&&(!Number.isInteger(action.revision)||action.revision<0))throw Error('Invalid portfolio revision');
+ if(action.kind==='portfolioDelete'&&(typeof action.id!=='string'||!/^[-a-zA-Z0-9]{1,80}$/.test(action.id)))throw Error('Invalid transaction ID');
  const validPerson=p=>typeof p==='string'&&p.trim()===p&&p.length>0&&p.length<=120&&!/[\u0000-\u001f<>]/.test(p);
  if(action.kind==='followPolitician'&&(!validPerson(action.person)||typeof action.enabled!=='boolean'))throw Error('Invalid politician follow');
  if(action.kind==='importFollows'&&(!Array.isArray(action.people)||action.people.length>100||!action.people.every(validPerson)))throw Error('Invalid saved follows');
@@ -144,6 +148,14 @@ async function workspace(request,env){
   }
   if(action?.kind==='deleteRule')state.rules=state.rules.filter(r=>r.id!==action.id);
   if(action?.kind==='readAlerts')state.readAt=Date.now();
+  if(['portfolioSave','portfolioDelete'].includes(action?.kind)){
+   if(action.revision!==(state.portfolioRevision||0))return json({error:'Portfolio changed on another device. Refresh before saving.'},409);
+   const entries=state.portfolioTransactions||[];let next;
+   if(action.kind==='portfolioSave'){const t=personalValidate(action.transaction),old=entries.find(x=>x.id===t.id);t.order=old?.order||Math.max(0,...entries.map(x=>x.order||0))+1;next=[...entries.filter(x=>x.id!==t.id),t]}else next=entries.filter(x=>x.id!==action.id);
+   if(next.length>1000)return json({error:'Maximum 1,000 portfolio transactions'},400);
+   try{personalPositions(next)}catch(e){return json({error:e.message},400)}
+   state.portfolioTransactions=next;state.portfolioRevision=(state.portfolioRevision||0)+1;
+  }
   if((state.rules.length||state.followedPoliticians?.length)&&(action?.kind==='rule'||action?.kind==='followPolitician'||Date.now()-state.evaluatedAt>60000)){
    const feeds=await Promise.all(['congress-universe-v4'].map(async k=>{const o=await env.BUCKET.get('pif/v1/'+k);return o?await o.json():null}));
    const records=feeds.flatMap(f=>f?.value?.rows||[]);const symbols=[...new Set(state.rules.filter(r=>r.type.startsWith('price')).map(r=>r.symbol))];const prices={};

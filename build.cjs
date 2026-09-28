@@ -1,4 +1,5 @@
 const fs=require('node:fs'),path=require('node:path');
+fs.writeFileSync('dist/personal-math.js',fs.readFileSync('server/holdings.mjs','utf8').replace(/export /g,''));
 require('./check-encoding.cjs').auditEncoding();
 const files={};
 const curated=require('node:vm').runInNewContext(fs.readFileSync('dist/roster.js','utf8')+'\n'+fs.readFileSync('dist/data.js','utf8')+'\nselectedRecords(SEED)');
@@ -14,6 +15,6 @@ html=html.replace(/<script src="([^"]+)"><\/script>/g,(_,src)=>{const original='
 files['/index.html'].body=html;
 for(const file of Object.values(files))file.etag='"'+hash(file.body)+'"';
 fs.mkdirSync('dist/server',{recursive:true});fs.mkdirSync('dist/.openai',{recursive:true});
-fs.writeFileSync('dist/server/index.js','const FILES='+JSON.stringify(files)+';\nconst STATIC_RESEARCH_ROWS='+JSON.stringify(curated)+';\n'+fs.readFileSync('server/predictions.mjs','utf8').replace(/export /g,'')+'\n'+fs.readFileSync('server/chat.mjs','utf8').replace(/export /g,'')+'\n'+fs.readFileSync('server/research.mjs','utf8').replace(/export /g,'')+'\n'+fs.readFileSync('server/worker.mjs','utf8').replace("import {researchRoute,researchIngest} from './research.mjs';",'').replace("import {chatRoute} from './chat.mjs';",'').replace("import {predictionsRoute} from './predictions.mjs';",''));
+fs.writeFileSync('dist/server/index.js','const FILES='+JSON.stringify(files)+';\nconst STATIC_RESEARCH_ROWS='+JSON.stringify(curated)+';\n'+fs.readFileSync('server/predictions.mjs','utf8').replace(/export /g,'')+'\n'+fs.readFileSync('server/chat.mjs','utf8').replace(/export /g,'')+'\n'+fs.readFileSync('server/research.mjs','utf8').replace(/export /g,'')+'\n'+fs.readFileSync('server/holdings.mjs','utf8').replace(/export /g,'')+'\n'+fs.readFileSync('server/worker.mjs','utf8').replace("import {personalValidate,personalPositions} from './holdings.mjs';",'').replace("import {researchRoute,researchIngest} from './research.mjs';",'').replace("import {chatRoute} from './chat.mjs';",'').replace("import {predictionsRoute} from './predictions.mjs';",''));
 fs.copyFileSync('.openai/hosting.json','dist/.openai/hosting.json');
 console.log('Built poor Worker and embedded '+Object.keys(files).length+' public assets.');
