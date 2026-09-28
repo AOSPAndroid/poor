@@ -1,0 +1,46 @@
+/* Shared geometry across every workspace. Keep data tables dense and legible. */
+:root{--radius-control:9px;--radius-inset:10px;--radius-panel:14px;--radius-dialog:20px;--surface:#fff;--surface-subtle:#f7f9f8;--border-soft:#dfe6e3;--shadow-panel:0 2px 6px #16382c05;--shadow-overlay:0 16px 56px #16382c24}
+body{background:#f4f6f5}
+:is(.panel,.person-card,.home-section,.quote-card,.daily-article,.shared-buy-card,.favorites-ribbon,.setup-card,.setup-empty,.accountability-panel,.terminal-watch,.terminal-news,.stock-overview,.chart-panel,.stock-disclosures,.swing-panel,.market-context,.research-panel,.risk-panel,.pm-detail,.pm-market,.map-board,.map-controls,.timeline-event article){border-radius:var(--radius-panel);box-shadow:var(--shadow-panel)}
+:is(.panel,.person-card,.home-section,.quote-card,.daily-article,.shared-buy-card,.favorites-ribbon,.terminal-watch,.terminal-news,.stock-overview,.chart-panel,.stock-disclosures,.swing-panel,.market-context,.research-panel,.risk-panel,.pm-detail){border:1px solid var(--border-soft)}
+:is(.research-panel,.risk-panel){margin-top:2px}
+.board-card,.people-card{border-radius:var(--radius-panel)}
+.home-market-strip>button,.home-market-strip>div,.coverage-strip,.home-changes,.decision-check,.pm-facts,.pm-quote,.pm-insight,.detail-grid,.return-detail,.annual-record,.map-thesis,.map-relation{border-radius:var(--radius-inset)}
+.table-scroll,.home-table-wrap,.stock-table-wrap,.research-table-wrap{border-radius:var(--radius-inset)}
+.table-scroll{border-color:var(--border-soft)}
+/* Headers inherit their parent's curve, so their white background cannot square it off. */
+.favorites-ribbon-head,.pane-title:first-child{border-radius:calc(var(--radius-panel) - 1px) calc(var(--radius-panel) - 1px) 0 0;background:var(--surface-subtle);border-bottom-color:var(--border-soft)}
+.favorites-ribbon-head{gap:8px;padding:10px 12px}
+.favorites-ribbon-head b{letter-spacing:-.015em}
+.terminal-watch .watch-row:last-child,.terminal-news .news-item:last-child{border-radius:0 0 var(--radius-inset) var(--radius-inset)}
+.appbar{border-bottom-color:var(--border-soft)}
+.appbar>nav>.nav,.app-utilities .nav{border-radius:var(--radius-control)}
+.appbar>nav>.nav.active{box-shadow:none;background:#e6f1eb;color:#175f43}
+.app-utilities{border-radius:var(--radius-panel);border-color:var(--border-soft);box-shadow:var(--shadow-overlay);padding:8px}
+:is(.primary,.secondary,.command-trigger,#utilityToggle,.row-details,.table-footer button,.favorites-ribbon-head button,.setup-actions button,.stock-actions button,.board-jumps button,.board-zoom button,.people-actions button,.people-shortcuts button,.pm-detail button,.chat-empty button,#chatHistory button,.daily-tickers button,.news-tickers button,.connection-bar button,.detail-connections button,.daily-stock-filter button){border-radius:var(--radius-control)}
+.map-controls button.primary,.map-controls button.secondary,.map-controls .board-jumps button{border-radius:var(--radius-control)}
+.home-heading>button,.pm-heading>button,.map-heading>button,.alerts-heading>button{border:1px solid var(--border-soft);border-radius:var(--radius-control);padding:7px 10px;background:white;font-weight:550}
+input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea,.search{border-radius:var(--radius-control)}
+.map-controls :is(#mapPerson,#mapTicker,#mapSearch),.politician-searchbar input,.pm-controls input[type=search],.pm-controls select,#tickerInput,#alertForm input,#alertForm select,.risk-fields input,.risk-fields select{border-radius:var(--radius-control)}
+.tabs,.map-mode-tabs,.range-buttons{border-radius:var(--radius-inset);padding:3px;gap:3px;background:#edf2ef}
+.tabs button,.map-mode-tabs button,.range-buttons button{border-radius:7px}
+.tabs .selected,.map-mode-tabs button[aria-pressed=true],.range-buttons button.selected{background:white;color:#175f43;box-shadow:0 1px 4px #183b2b12}
+/* Round overlays as a whole; retain internal scrolling and native dialog semantics. */
+dialog,.market-mode dialog,dialog.map-inspector{border-radius:var(--radius-dialog);border:1px solid var(--border-soft);box-shadow:var(--shadow-overlay);background:var(--surface);padding:24px;max-height:calc(100dvh - 32px);scrollbar-width:thin}
+dialog::backdrop{background:#172b2659;backdrop-filter:blur(4px)}
+dialog:not(#commandPalette) h2{padding-right:44px;line-height:1.2;letter-spacing:-.025em}
+dialog .close,dialog.map-inspector .close{position:absolute;right:12px;top:12px;float:none;width:36px;height:36px;min-width:36px;min-height:36px;display:grid;place-items:center;line-height:1;border:1px solid var(--border-soft);border-radius:var(--radius-control);background:var(--surface-subtle);font-size:24px;z-index:2}
+dialog.map-inspector .map-detail{padding-top:20px}
+#commandPalette{padding:6px;border-radius:var(--radius-dialog);overflow:hidden}
+.command-search{border-radius:14px 14px 0 0}
+.command-option{border-radius:var(--radius-control)}
+.command-search button{border-radius:7px}
+.chat-popover{border-radius:var(--radius-dialog);border-color:var(--border-soft);box-shadow:var(--shadow-overlay);overflow:hidden}
+.chat-window-controls{border-radius:19px 19px 0 0;background:var(--surface-subtle);border-bottom:1px solid var(--border-soft)}
+.chat-window-controls button,#chatTopActions button{border-radius:var(--radius-control)}
+#poorChatForm,.chat-question,.chat-empty button,#chatHistory button{border-radius:var(--radius-panel)}
+.chat-question{background:#eaf3ee}
+.chat-context-options,.chat-page-context{border-radius:var(--radius-inset)}
+#toast{border-radius:var(--radius-inset);box-shadow:var(--shadow-overlay)}
+@media(hover:hover){.secondary:hover,.home-heading>button:hover,.pm-heading>button:hover,.map-heading>button:hover,.favorites-ribbon-head button:hover{background:#eef5f1;filter:none;border-color:#b6cfc0}}
+@media(max-width:700px){dialog,.market-mode dialog,dialog.map-inspector{padding:18px;width:calc(100% - 20px);max-height:calc(100dvh - 24px)}#commandPalette{padding:6px}.favorites-ribbon-head{padding:8px 10px}.home-heading>button,.pm-heading>button,.map-heading>button,.alerts-heading>button{min-height:40px}.chat-popover{border-radius:18px}.chat-window-controls{border-radius:17px 17px 0 0}}
