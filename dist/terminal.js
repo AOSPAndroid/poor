@@ -130,5 +130,5 @@ if(typeof window!=='undefined'){
  $('#alertForm').onsubmit=async e=>{e.preventDefault();const type=$('#ruleType').value,action={kind:'rule',symbol:$('#ruleSymbol').value.trim().toUpperCase(),type};if(type.startsWith('price'))action.threshold=Number($('#ruleThreshold').value);if(await workspaceAction(action)){$('#alertDialog').close();notify('Alert rule saved')}};
  window.addEventListener('hashchange',()=>{const match=location.hash.match(/^#stock\/([A-Za-z0-9.-]+)$/);if(match)openStock(match[1],false);else if(!location.hash)changeView('home')});
  const initial=location.hash.match(/^#stock\/([A-Za-z0-9.-]+)$/)?.[1];
- workspaceAction().then(()=>loadMarketPrices([...workspaceState.symbols,...workspaceState.rules.map(r=>r.symbol)])).then(renderTerminal);if(initial)openStock(initial,false);else changeView('home');
+ workspaceAction().then(()=>loadMarketPrices([...workspaceState.symbols,...workspaceState.rules.map(r=>r.symbol)])).then(renderTerminal);if(initial)openStock(initial,false);else if(location.hash!=='#predictions')changeView('home');
 }
