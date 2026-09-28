@@ -101,9 +101,40 @@ async function loadMarketPrices(symbols){
  if(typeof refreshRatingBadges==='function')refreshRatingBadges();
 }
 
+let workspaceQueue=Promise.resolve();
 async function workspaceAction(action){
- if(workspaceBusy)return;workspaceBusy=true;
- try{const r=await fetch('/api/workspace',action?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(action)}:{cache:'no-store'}),result=await r.json();if(!r.ok)throw Error(result.error||'Workspace unavailable');if(!Array.isArray(result.symbols)||!Array.isArray(result.rules))throw Error('Workspace unavailable');workspaceState=result;workspaceReady=true;if(typeof renderResearchPriority==='function')renderResearchPriority();$('#workspaceStatus').textContent=result.user?'Synced to your ChatGPT account':'Guest · this browser';renderTerminal();if(typeof renderHome==='function')renderHome();return true}catch(e){$('#workspaceStatus').textContent='Workspace unavailable · retry shortly';notify(e.message);return false}finally{workspaceBusy=false;if(typeof renderHome==='function')renderHome()}
+ const operation=workspaceQueue.then(()=>performWorkspaceAction(action));
+ workspaceQueue=operation.catch(()=>false);return operation;
+}
+async function workspaceRequest(action){
+ const r=await fetch('/api/workspace',action?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(action)}:{cache:'no-store'}),result=await r.json();
+ if(!r.ok)throw Error(result.error||'Workspace unavailable');
+ if(!Array.isArray(result.symbols)||!Array.isArray(result.rules))throw Error('Workspace unavailable');return result;
+}
+async function performWorkspaceAction(action){
+ workspaceBusy=true;
+ try{
+  // Read and migrate before a first follow mutation, so old browser saves are not lost.
+  let result=await workspaceRequest(workspaceReady?action:undefined);
+  const scope=result.user?'account:'+result.user.email:'guest';
+  if(!Array.isArray(result.followedPoliticians)){
+   const owner=read('poor-follows-legacy-owner',null),cached=read('poor-follows:'+scope,null);
+   const legacy=owner===null||owner===scope||owner==='guest'?read('cl-follows',[]):[];
+   const people=(Array.isArray(cached)?cached:Array.isArray(legacy)?legacy:[]).filter(p=>typeof p==='string'&&p.trim()===p&&p.length>0&&p.length<=120&&!/[\u0000-\u001f<>]/.test(p)).slice(0,100);
+   result=await workspaceRequest({kind:'importFollows',people});
+   persist('poor-follows-legacy-owner',scope);
+  }
+  if(!workspaceReady&&action)result=await workspaceRequest(action);
+  workspaceState=result;workspaceReady=true;
+  follows=new Set(result.followedPoliticians||[]);
+  persist('poor-follows:'+scope,[...follows]);
+  // The legacy key remains a guest/sign-in migration backup, owned by this identity.
+  persist('cl-follows',[...follows]);persist('poor-follows-legacy-owner',scope);
+  renderPeople();renderRows();
+  if($('#followSyncStatus'))$('#followSyncStatus').textContent=result.user?'Followed politicians · saved to your account across devices':'Followed politicians · saved for this browser. Sign in to keep them across devices.';
+  if(typeof renderResearchPriority==='function')renderResearchPriority();$('#workspaceStatus').textContent=result.user?'Synced to your ChatGPT account':'Guest · this browser';renderTerminal();if(typeof renderHome==='function')renderHome();return true;
+ }catch(e){const message=action?'Could not save this change · please retry':'Could not sync · previously loaded follows retained';$('#workspaceStatus').textContent=message;if($('#followSyncStatus'))$('#followSyncStatus').textContent=message;notify(e.message+(action?' · change not saved; please retry':''));return false}
+ finally{workspaceBusy=false;if(typeof renderHome==='function')renderHome()}
 }
 function ruleLabel(r){return r.type==='priceAbove'?`Close ≥ ${r.threshold}`:r.type==='priceBelow'?`Close ≤ ${r.threshold}`:r.type==='cluster'?'New 30-day buying cluster':'New disclosure'}
 function renderAlerts(){

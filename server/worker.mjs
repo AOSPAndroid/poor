@@ -87,7 +87,10 @@ export function newsRows(xml){
 async function pricesFor(env,symbol){return cached(env,'prices-v4/'+symbol,15*60000,async()=>chartPrices(await fetchJSON(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=5y&interval=1d`),symbol))}
 const DEFAULT_WATCH=['BE','INTC','NVDA','SPY'];
 export function validateWorkspaceAction(action){
- if(!action||!['watch','rule','deleteRule','readAlerts','researchPriority'].includes(action.kind))throw Error('Unknown action');
+ if(!action||!['watch','rule','deleteRule','readAlerts','researchPriority','followPolitician','importFollows'].includes(action.kind))throw Error('Unknown action');
+ const validPerson=p=>typeof p==='string'&&p.trim()===p&&p.length>0&&p.length<=120&&!/[\u0000-\u001f<>]/.test(p);
+ if(action.kind==='followPolitician'&&(!validPerson(action.person)||typeof action.enabled!=='boolean'))throw Error('Invalid politician follow');
+ if(action.kind==='importFollows'&&(!Array.isArray(action.people)||action.people.length>100||!action.people.every(validPerson)))throw Error('Invalid saved follows');
  if(['watch','rule'].includes(action.kind)&&!symbolOK(action.symbol))throw Error('Invalid ticker');
  if(['watch','researchPriority'].includes(action.kind)&&typeof action.enabled!=='boolean')throw Error('Invalid watch setting');
  if(action.kind==='rule'&&(!['priceAbove','priceBelow','filings','cluster'].includes(action.type)||(['priceAbove','priceBelow'].includes(action.type)&&!(Number.isFinite(action.threshold)&&action.threshold>0&&action.threshold<1e9))))throw Error('Invalid alert rule');
@@ -126,6 +129,12 @@ async function workspace(request,env){
  for(let attempt=0;attempt<3;attempt++){
   const object=await env.BUCKET.get(key),state=object?await object.json():{symbols:DEFAULT_WATCH.slice(),rules:[],alerts:[],readAt:0,evaluatedAt:0};
   state.alerts=state.alerts.map(a=>({...a,detail:a.detail?.replace(/Newly observed by PIF/g,'Newly observed by poor')}));
+  if(action?.kind==='importFollows'&&!Array.isArray(state.followedPoliticians))state.followedPoliticians=[...new Set(action.people)];
+  if(action?.kind==='followPolitician'){
+   const people=Array.isArray(state.followedPoliticians)?state.followedPoliticians:[];
+   state.followedPoliticians=action.enabled?[...new Set([...people,action.person])]:people.filter(p=>p!==action.person);
+   if(state.followedPoliticians.length>100)return json({error:'Follow up to 100 politicians'},400);
+  }
   if(action?.kind==='researchPriority'){if(!user)return json({error:'Sign in to prioritize favorites'},401);state.researchPriority=action.enabled;}
   if(action?.kind==='watch'){state.symbols=action.enabled?[...new Set([...state.symbols,action.symbol])]:state.symbols.filter(s=>s!==action.symbol);if(state.symbols.length>30)return json({error:'Watch up to 30 stocks'},400)}
   if(action?.kind==='rule'){
