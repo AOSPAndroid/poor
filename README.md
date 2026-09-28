@@ -175,6 +175,8 @@ Tests: `python verify-decision-checks.py`, plus the investigation and research-e
 
 ### Public research quality gate
 
+Primary navigation follows the research workflow: Home, Research, Terminal, Polymarket and Watchlist. More groups politicians, disclosures, the map, alerts, Ask poor, sources and account/import/export controls. Existing keyboard shortcuts remain available. Home retains favorites first, shows stock/contract research beside up to three visible briefing items on desktop/tablet (stacked on mobile), and keeps additional news expandable. Unchanged visit banners are hidden; research performance and methodology are collapsed below current market information.
+
 Investigation cards require an explicit decisive-document retrieval flag from the worker; URLs alone are insufficient. Unverified attempts remain in the stored activity/case history and retry queue, not the main Home/Research/contract cards. New general news publication uses the same retrieval gate. This is a provenance screen, not proof that claims are correct. Existing published daily articles keep their separate validation and history.
 
 Home shows only supported findings from the last three days; stock/contract findings also require a supported independent review. A supported general briefing may appear without a second review. With no qualifying findings, that Home section is hidden so the regular market news and tools retain the space. Research allows sourced wait/rejected findings and preserves older/superseded sourced cases in collapsed history. The latest attempt always wins per target: an unsuccessful follow-up never silently revives an older optimistic thesis. Tests: `node verify-research-feed.mjs`.

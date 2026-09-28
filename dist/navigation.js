@@ -68,6 +68,6 @@ if(typeof window!=='undefined'){
  const toggle=$('#utilityToggle');
  function closeUtilities(){document.querySelector('.appbar').classList.remove('utilities-open');toggle.setAttribute('aria-expanded','false')}
  toggle.onclick=()=>{const on=toggle.getAttribute('aria-expanded')!=='true';document.querySelector('.appbar').classList.toggle('utilities-open',on);toggle.setAttribute('aria-expanded',String(on))};
- document.addEventListener('click',e=>{if(!e.target.closest('.app-actions')||e.target.closest('#exportButton,#importButton'))closeUtilities()});
+ document.addEventListener('click',e=>{if(!e.target.closest('.app-actions')||e.target.closest('#exportButton,#importButton,#appUtilityMenu [data-view]'))closeUtilities()});
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&toggle.getAttribute('aria-expanded')==='true'){closeUtilities();toggle.focus()}});
 }
