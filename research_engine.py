@@ -21,8 +21,8 @@ def invoke(prompt, seconds, discovery=True,profile=None):
     profile=Path(profile) if profile else PROFILE
     import yaml
     model=yaml.safe_load((profile/'config.yaml').read_text(encoding='utf-8')).get('model',{}).get('default','grok-4.7')
-    args=[str(PROFILE.parents[1]/'bin/hermes.exe'),'--profile',profile.name,'chat','--ignore-user-config','--ignore-rules','--provider','xai-oauth','--model',model,'--oneshot','-Q','--query-file','-','--max-turns','6' if discovery else '2','--run-budget',str(seconds),'--toolsets','search,x_search' if discovery else 'context_engine']
-    if not discovery:args+=['--safe-mode','--reasoning','low']
+    args=[str(PROFILE.parents[1]/'bin/hermes.exe'),'--profile',profile.name,'chat','--ignore-user-config','--ignore-rules','--provider','xai-oauth','--model',model,'--reasoning','low','--oneshot','-Q','--query-file','-','--max-turns','6' if discovery else '2','--run-budget',str(seconds),'--toolsets','search,x_search' if discovery else 'context_engine']
+    if not discovery:args+=['--safe-mode']
     started=time.time()
     proc=subprocess.Popen(args,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,encoding='utf-8',errors='replace',creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
     try:out,err=proc.communicate(prompt,timeout=seconds+20)
