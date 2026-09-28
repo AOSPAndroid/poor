@@ -51,7 +51,7 @@ if(typeof window!=='undefined')$('#explainMap').onclick=explainCurrentMap;
 
 function chatPageContext(){
  if(view==='chat'&&lastChatPage)return lastChatPage;
- const names={home:'Home',market:'Workspace',map:'Research map',politicians:'Politicians',predictions:'Polymarket',daily:'Research',trades:'Political trades',watchlist:'Watchlist',alerts:'Alerts',sources:'Sources',chat:'Ask poor'};
+ const names={timeline:'Political timeline',home:'Home',market:'Workspace',map:'Research map',politicians:'Politicians',predictions:'Polymarket',daily:'Research',trades:'Political trades',watchlist:'Watchlist',alerts:'Alerts',sources:'Sources',chat:'Ask poor'};
  let label=names[view]||'poor',text='',symbol='';
  const readText=id=>document.getElementById(id)?.innerText||'';
  if(view==='map'){label+=' · '+(mapMode==='people'?peopleRoot:mapTicker);text=mapExplanationPrompt();symbol=mapMode==='stock'?mapTicker:''}
