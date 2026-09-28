@@ -131,6 +131,12 @@ def run(research=False,local=False):
             bad+=1;failures.append(path)
             if not any(i['path']==path for i in issues):issues.append({'path':path,'reason':'request failed'})
             return {}
+    # Refresh registered research prices without model calls, then update the scorecard.
+    archive=get('/api/research/daily') or {}
+    measured=list(dict.fromkeys(a.get('measurement',{}).get('symbol') for e in archive.get('editions',[]) for a in e.get('articles',[]) if a.get('measurement',{}).get('direction')=='long'))
+    measured=[s for s in measured if isinstance(s,str) and re.fullmatch(r'[A-Z][A-Z0-9.-]{0,11}',s)]
+    for offset in range(0,len(measured),8):get('/api/prices?symbols='+','.join(measured[offset:offset+8]+['SPY']))
+    get('/api/research/scorecard')
     get('/api/feed/congress');treasury=get('/api/research/treasury');get('/api/prices?symbols=SPY,QQQ,TLT,HYG,LQD,UUP')
     if not treasury and not local and config.get('token'):
         try:

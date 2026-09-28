@@ -60,6 +60,7 @@ export async function researchRoute(url,env,cache,priceLoader){const path=url.pa
  if(path==='/api/research/status'){const o=await env.BUCKET.get('poor/research/collector');return {collector:o?await o.json():null,congressConnected:!!env.CONGRESS_API_KEY,earningsConnected:!!env.ALPHA_VANTAGE_API_KEY}}
  if(path==='/api/research/politics'){const feed=await readResearch(env,'pif/v1/congress-universe-v4');return {value:{rows:mapPoliticalRows(feed),coverage:'Curated source records plus loaded feed; original provenance retained'}};}
  if(path==='/api/research/daily')return dailyArchive(env);
+ if(path==='/api/research/scorecard')return cache(env,'research-scorecard-v1',15*60000,()=>researchScorecard(env,priceLoader));
  if(path==='/api/research/performance')return articlePerformance(env,url.searchParams.get('id'),priceLoader);
  const symbol=url.searchParams.get('symbol');if(!/^[A-Z][A-Z0-9.-]{0,11}$/.test(symbol||''))return {error:'Invalid ticker'};
  if(path==='/api/research/signals')return evidenceSignals(env,symbol);
@@ -115,11 +116,12 @@ export async function researchIngest(request,env){
    if(!['title','tldr','why','risk','watch'].every(k=>typeof a[k]==='string'&&a[k].trim()&&a[k].length<=(k==='title'?160:800))||!day(a.published)||a.published>today()||a.published<ago(7)||!Array.isArray(a.tickers)||a.tickers.length>8||a.tickers.some(t=>!/^[$A-Z][A-Z0-9.-]{0,11}$/.test(t))||!Array.isArray(a.sources)||!a.sources.length||a.sources.length>4)return {status:400,body:{error:'Invalid article fields'}};
    const sources=a.sources.map(u=>{try{const x=new URL(u);return x.protocol==='https:'&&!x.username&&!x.password&&x.hostname.includes('.')&&u.length<1500?u:null}catch{return null}});if(sources.some(u=>!u))return {status:400,body:{error:'Invalid sources'}};
    if(!validDailyThesis(a))return {status:400,body:{error:'Research requires two evidence types, sourced facts and a testable thesis'}};
-   articles.push({title:a.title,tldr:a.tldr,why:a.why,risk:a.risk,watch:a.watch,published:a.published,tickers:a.tickers,sources,format:2,evidence:a.evidence,pricedIn:a.pricedIn,invalidation:a.invalidation,horizon:a.horizon});
+   if(a.tradePlan!==undefined&&!validTradePlan(a.tradePlan,a.tickers))return {status:400,body:{error:'Invalid decision plan'}};
+   articles.push({title:a.title,tldr:a.tldr,why:a.why,risk:a.risk,watch:a.watch,published:a.published,tickers:a.tickers,sources,format:2,evidence:a.evidence,pricedIn:a.pricedIn,invalidation:a.invalidation,horizon:a.horizon,...(a.tradePlan?{tradePlan:a.tradePlan}:{})});
   }
   const object=await env.BUCKET.get('poor/research/daily'),old=object?await object.json():{editions:[]},now=new Date().toISOString();
   const editions=old.editions||[],known=new Set(editions.flatMap(e=>e.articles).map(a=>[...a.sources].sort().join('|')));const fresh=articles.filter(a=>!known.has([...a.sources].sort().join('|')));
-  for(const a of fresh){a.id=await researchId(now+'|'+a.title+'|'+a.sources.join('|'));a.publishedAt=now;}
+  for(const a of fresh){a.id=await researchId(now+'|'+a.title+'|'+a.sources.join('|'));a.publishedAt=now;if(a.tradePlan)a.measurement={version:1,registeredAt:now,symbol:a.tradePlan.symbol,direction:a.tradePlan.direction,holdingSessions:20,oneWayCostBps:10};}
   if(fresh.length)editions.unshift({date:b.date,createdAt:now,articles:fresh});
   const next={editions:editions,lastAttempt:now,status:String(b.status|| (fresh.length?'Published '+fresh.length+' new briefs':'No qualifying new stories')).slice(0,300),schedule:'Daily at 08:00 Europe/Paris while the PC is awake and signed in'};
   await env.BUCKET.put('poor/research/daily',JSON.stringify(next));return {status:200,body:{ok:true,published:fresh.length}};
@@ -202,3 +204,42 @@ async function connectionMap(env,symbol){
 }
 
 function mapPoliticalRows(feed){const curated=typeof STATIC_RESEARCH_ROWS==='undefined'?[]:STATIC_RESEARCH_ROWS;const key=r=>[r.source,r.person,r.ticker,r.traded].join('|'),known=new Set(curated.map(key));return [...curated,...(feed?.value?.rows||[]).filter(r=>!known.has(key(r)))];}
+export function validTradePlan(p,tickers){return p&&['long','watch'].includes(p.direction)&&tickers.includes(p.symbol)&&['entryTrigger','exitRule','catalyst'].every(k=>typeof p[k]==='string'&&p[k].trim().length>=10&&p[k].length<=350)}
+// Prospective research measurement, separate from real executed-trade P&L.
+export function evaluateResearchOutcome(a,stock,benchmark,now=Date.now()){
+ const m=a.measurement,base={id:a.id,title:a.title,symbol:m?.symbol,publishedAt:a.publishedAt,registeredAt:m?.registeredAt};
+ if(!m||m.version!==1)return {...base,state:'Legacy · not registered'};
+ if(m.direction!=='long')return {...base,state:'Watch only'};
+ const published=Date.parse(a.publishedAt),registered=Date.parse(m.registeredAt);
+ if(!Number.isFinite(published)||published!==registered||published>now)return {...base,state:'Invalid registration'};
+ if(stock?.stale||stock?.error||benchmark?.stale||benchmark?.error)return {...base,state:'Data unavailable or stale'};
+ const p=stock?.value,b=benchmark?.value,cutoff=new Date(now).toISOString().slice(0,10);
+ if(!p||!b||p.currency!=='USD'||b.currency!=='USD'||!['EQUITY','ETF'].includes(p.instrument))return {...base,state:'Comparable USD stock history needed'};
+ const good=n=>Number.isFinite(n)&&n>0;
+ const dates=Object.keys(b.closes||{}).filter(d=>day(d)&&d>a.publishedAt.slice(0,10)&&d<=cutoff&&d<=b.asOf&&good(b.closes[d])).sort(),entry=dates[0];
+ if(!entry)return {...base,state:'Awaiting entry close'};
+ if(Date.parse(entry)-Date.parse(a.publishedAt.slice(0,10))>7*86400000)return {...base,state:'Entry history missing'};
+ const end=dates[20],span=dates.slice(0,21);
+ if(span.some(d=>!good(p.closes?.[d])||d>p.asOf))return {...base,state:'Stock history incomplete',entry};
+ if(!end)return {...base,state:'Measuring',entry,sessions:Math.max(0,span.length-1)};
+ const net=(start,finish,bps)=>(finish*(1-bps/10000)/(start*(1+bps/10000))-1)*100;
+ const result=net(p.closes[entry],p.closes[end],10),benchmarkReturn=net(b.closes[entry],b.closes[end],10);
+ let peak=p.closes[entry],drawdown=0;for(const d of span){peak=Math.max(peak,p.closes[d]);drawdown=Math.min(drawdown,(p.closes[d]/peak-1)*100)}
+ return {...base,state:'Completed',entry,end,sessions:20,entryPrice:p.closes[entry],exitPrice:p.closes[end],netReturn:result,benchmarkReturn,excess:result-benchmarkReturn,costStressReturn:net(p.closes[entry],p.closes[end],25),drawdown,measuredAt:new Date(now).toISOString(),source:p.source||null};
+}
+export function summarizeResearchOutcomes(rows){
+ const done=rows.filter(r=>r.state==='Completed'),mean=k=>done.length?done.reduce((s,r)=>s+r[k],0)/done.length:null;
+ return {completed:done.length,winners:done.filter(r=>r.netReturn>0).length,losers:done.filter(r=>r.netReturn<0).length,flat:done.filter(r=>r.netReturn===0).length,winRate:done.length?100*done.filter(r=>r.netReturn>0).length/done.length:null,meanNet:mean('netReturn'),meanExcess:mean('excess'),costStress:mean('costStressReturn'),worstDrawdown:done.length?Math.min(...done.map(r=>r.drawdown)):null};
+}
+async function researchScorecard(env,priceLoader){
+ const archive=await dailyArchive(env),all=archive.editions.flatMap(e=>e.articles),registered=all.filter(a=>a.measurement?.version===1).sort((a,b)=>a.publishedAt.localeCompare(b.publishedAt)),selected=registered.slice(0,200),rows=[],memo=new Map();
+ const quote=async symbol=>{if(!memo.has(symbol))memo.set(symbol,readResearch(env,'pif/v1/prices-v4/'+symbol).then(q=>q?{...q,stale:!!q.error||Date.now()-Number(q.checkedAt)>36*RHOUR}:null));return memo.get(symbol)};
+ for(const a of selected){
+  const key='poor/research/outcomes-v1/'+a.id,saved=await readResearch(env,key);
+  if(saved){rows.push({...saved,lastReview:a.reviews?.at(-1)?.verdict||'Pending'});continue}
+  const stock=a.measurement.direction==='long'?await quote(a.measurement.symbol):null,benchmark=a.measurement.direction==='long'?await quote('SPY'):null;
+  const row=evaluateResearchOutcome(a,stock,benchmark);if(row.state==='Completed')await env.BUCKET.put(key,JSON.stringify(row));
+  rows.push({...row,lastReview:a.reviews?.at(-1)?.verdict||'Pending'});
+ }
+ return {status:'Edge not established',protocol:'research-v1',updatedAt:new Date().toISOString(),registered:registered.length,legacy:all.length-registered.length,omitted:Math.max(0,registered.length-selected.length),summary:summarizeResearchOutcomes(rows),rows:rows.reverse(),method:'New explicitly long research theses only; primary USD stock/ETF, first close strictly after publication UTC date, exit 20 S&P 500 proxy sessions later. Fixed 10 basis points per side; stress case 25 per side. Same-date SPY price-return comparison with the same cost assumption. Completed observations are frozen; losses and invalidated theses remain. Research outcomes are not executed trades. Entry triggers are not simulated. No dividends, taxes, intraday stops or options. Overlapping theses are not independent; averages are not portfolio returns. Legacy articles and watch-only theses do not enter return statistics.'};
+}

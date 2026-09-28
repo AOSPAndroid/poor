@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import {evaluateResearchOutcome as evaluate,summarizeResearchOutcomes as summarize,validTradePlan,researchRoute,researchIngest} from './server/research.mjs';
+const now=Date.parse('2026-03-10T20:00:00Z'),publication='2026-01-01T12:00:00Z';
+const dates=[];for(let t=Date.parse('2026-01-02');dates.length<21;t+=86400000){const d=new Date(t);if(d.getUTCDay()!==0&&d.getUTCDay()!==6)dates.push(d.toISOString().slice(0,10))}
+const a={id:'a'.repeat(24),title:'Prospective thesis',publishedAt:publication,measurement:{version:1,registeredAt:publication,symbol:'TEST',direction:'long'}};
+const price=finish=>({value:{currency:'USD',instrument:'EQUITY',asOf:dates.at(-1),closes:Object.fromEntries(dates.map((d,i)=>[d,100+(finish-100)*i/20]))}});
+const winner=evaluate(a,price(110),price(105),now);assert.equal(winner.state,'Completed');assert.equal(winner.entry,dates[0]);assert.equal(winner.end,dates[20]);assert(Math.abs(winner.netReturn-9.78021978)<1e-6);assert(winner.costStressReturn<winner.netReturn);assert(winner.excess>4.9);
+const loser=evaluate(a,price(90),price(105),now);assert(loser.netReturn<0);assert.equal(loser.drawdown,-9.999999999999998);
+assert.equal(evaluate({...a,measurement:undefined},price(110),price(105),now).state,'Legacy · not registered');
+assert.equal(evaluate({...a,measurement:{...a.measurement,registeredAt:'2026-02-01'}},price(110),price(105),now).state,'Invalid registration');
+assert.equal(evaluate(a,{...price(110),stale:true},price(105),now).state,'Data unavailable or stale');
+const missing=price(110);delete missing.value.closes[dates[3]];assert.equal(evaluate(a,missing,price(105),now).state,'Stock history incomplete');
+assert.equal(evaluate(a,price(110),price(105),Date.parse(dates[10]+'T23:00Z')).state,'Measuring');
+const stats=summarize([winner,loser,{state:'Measuring'}]);assert.equal(stats.completed,2);assert.equal(stats.winRate,50);assert.equal(stats.losers,1);assert.equal(summarize([]).meanNet,null);
+assert(validTradePlan({symbol:'TEST',direction:'long',entryTrigger:'Close above prior high',exitRule:'Exit if guidance is cut',catalyst:'Next filed earnings release'},['TEST']));assert(!validTradePlan({symbol:'TEST',direction:'long'},['TEST']));
+const data=new Map([['poor/research/daily',JSON.stringify({editions:[{articles:[a]}]})],['pif/v1/prices-v4/TEST',JSON.stringify({...price(110),checkedAt:Date.now()})],['pif/v1/prices-v4/SPY',JSON.stringify({...price(105),checkedAt:Date.now()})]]),env={BUCKET:{get:async k=>data.has(k)?{json:async()=>JSON.parse(data.get(k))}:null,put:async(k,v)=>data.set(k,v)}};
+const cache=async(env,key,ttl,fn)=>({value:await fn()});const result=await researchRoute(new URL('https://test/api/research/scorecard'),env,cache);assert.equal(result.value.summary.completed,1);
+data.set('pif/v1/prices-v4/TEST',JSON.stringify({...price(50),checkedAt:Date.now()}));const frozen=await researchRoute(new URL('https://test/api/research/scorecard'),env,cache);assert.equal(frozen.value.rows[0].netReturn,result.value.rows[0].netReturn);
+assert.equal((await researchIngest(new Request('https://test/api/research/ingest',{method:'POST',body:'{}'}),env)).status,401);
+console.log('Prospective record: costs, losses, matched dates, missing/stale data, registration, frozen outcomes and auth passed.');
+import fs from 'node:fs';import vm from 'node:vm';
+const context={esc:s=>String(s).replaceAll('<','&lt;'),stamp:s=>s,date:s=>s};vm.createContext(context);vm.runInContext(fs.readFileSync('dist/edge-score.js','utf8'),context);
+const execution=context.predictionExecutionHTML({ask:.4,bid:.38,outcome:{label:'Yes'},market:{feesEnabled:true},book:{asks:[{price:.4,size:1000}]}});assert(execution.includes('5.00%'));assert(execution.includes('$400.00'));assert(execution.includes('40.0%'));assert(execution.includes('Fees apply'));
+assert(context.predictionExecutionHTML({ask:null,bid:.4}).includes('unavailable'));
+assert(context.edgeScoreHTML({summary:summarize([]),registered:0,rows:[],legacy:2,updatedAt:'2026-09-28',method:'Test'}).includes('Not established'));
