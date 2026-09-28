@@ -23,6 +23,7 @@ function renderDashboard(){
  const heading=document.createElement('div');heading.className='dashboard-heading';heading.innerHTML='<div><span class="dashboard-eyebrow">THE BIG PICTURE</span><h1>Market dashboard</h1></div><div><span id="dashboardClock"></span><button class="secondary" data-view="map">Explore the map ↗</button><button class="primary" data-view="chat">Ask poor ↗</button></div>';home.prepend(heading);
  const market=document.createElement('section');market.className='dashboard-market';market.setAttribute('aria-label','Market overview');heading.after(market);
  const etfs=$('#homeETFs').closest('.home-section');market.append(etfs);etfs.querySelector('h2').textContent='Market pulse';etfs.querySelector('.home-heading>span').textContent='Index & asset ETF proxies · daily closes';
+ const tech=document.createElement('section');tech.className='home-section dashboard-tech';tech.innerHTML='<div class="home-heading"><h2>Tech & Nasdaq ETFs</h2><span>Daily closes · 1M charts</span></div><div id="homeTechETFs" class="quote-grid"></div>';market.append(tech);$('#homeTechETFs').innerHTML=HOME_TECH_ETFS.map(quoteCard).join('');
  const conditions=home.querySelector('.home-conditions');market.append(conditions);conditions.querySelector('h2').textContent='Rates, risk & next events';
  const pulse=document.createElement('section');pulse.id='dashboardPulse';pulse.className='dashboard-pulse';pulse.setAttribute('aria-label','Political disclosure activity');market.after(pulse);
  const grid=document.createElement('div');grid.className='dashboard-intelligence';

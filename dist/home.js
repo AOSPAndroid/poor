@@ -1,7 +1,8 @@
 'use strict';
-const HOME_ETFS=['SPY','QQQ','DIA','IWM','TLT','GLD'];
+const HOME_ETFS=['SPY','VOO','DIA','IWM','TLT','GLD'];
+const HOME_TECH_ETFS=['QQQ','VGT','XLK','SOXX'];
 const HOME_STOCKS=['NVDA','AAPL','MSFT','AMZN','GOOG','TSLA','BE','INTC'];
-const HOME_NAMES={SPY:'S&P 500',QQQ:'Nasdaq 100',DIA:'Dow Jones',IWM:'Russell 2000',TLT:'Long-term Treasuries',GLD:'Gold',NVDA:'NVIDIA',AAPL:'Apple',MSFT:'Microsoft',AMZN:'Amazon',GOOG:'Alphabet',TSLA:'Tesla',BE:'Bloom Energy',INTC:'Intel'};
+const HOME_NAMES={SPY:'S&P 500',VOO:'Vanguard S&P 500',QQQ:'Nasdaq 100',VGT:'Vanguard technology',XLK:'S&P technology sector',SOXX:'Semiconductors',DIA:'Dow Jones',IWM:'Russell 2000',TLT:'Long-term Treasuries',GLD:'Gold',NVDA:'NVIDIA',AAPL:'Apple',MSFT:'Microsoft',AMZN:'Amazon',GOOG:'Alphabet',TSLA:'Tesla',BE:'Bloom Energy',INTC:'Intel'};
 let homeBusy=false;
 function homeTrackPriority(person){const r=typeof politicianRating==='function'?politicianRating(person):null;return r&&r.score!==null&&!r.stale&&r.score>=55?r.score:0}
 function latestPurchases(rows=signalData,now=Date.now()){
@@ -28,10 +29,10 @@ function followerCell(r){const p=followerReturn(r);return `<td class="home-discl
 function renderHome(){if(typeof renderPurchasesRibbon==='function')renderPurchasesRibbon();if(typeof renderFavoritesRibbon==='function')renderFavoritesRibbon();renderSharedBuying();if(typeof renderHomeInsights==='function')renderHomeInsights();
  if(!$('#homeView'))return;if(typeof renderContext==='function')renderContext();
  $('#homePurchases').innerHTML=strongInvestorMoves().map(r=>`<tr><td><button class="home-person" data-profile="${esc(r.person)}">${esc(r.person)}</button>${politicianRole(r.person)}<small>${esc(r.owner)}</small></td><td><button class="home-ticker" data-ticker="${esc(r.ticker)}">${esc(r.ticker)}</button><small>${esc(r.asset)}</small></td><td>${date(r.traded)}</td><td>${disclosedDate(r)?date(disclosedDate(r)):'Unknown'}</td><td>${esc(r.amount)}</td>${followerCell(r.type==='Sale'?{...r,type:'Purchase'}:r)}<td><span class="type-badge ${r.type.toLowerCase()}">${esc(r.type)}</span>${r.type==='Sale'?'<small>Stock move after sale</small>':''}</td><td><button class="row-details" data-detail="${esc(r.id)}" aria-label="Details for ${esc(r.person)} ${esc(r.ticker)} purchase">↗</button></td></tr>`).join('')||'<tr><td colspan="8">No recent moves from politicians with a usable Positive or Strong score. Browse all disclosures for unassessed activity.</td></tr>';
- $('#homeETFs').innerHTML=HOME_ETFS.map(quoteCard).join('');$('#homeStocks').innerHTML=HOME_STOCKS.map(quoteCard).join('');
+ $('#homeETFs').innerHTML=HOME_ETFS.map(quoteCard).join('');if($('#homeTechETFs'))$('#homeTechETFs').innerHTML=HOME_TECH_ETFS.map(quoteCard).join('');$('#homeStocks').innerHTML=HOME_STOCKS.map(quoteCard).join('');
  $('#homeBookmarks').innerHTML=workspaceState.symbols.map(s=>`<span class="favorite-chip"><button data-ticker="${esc(s)}">${esc(s)} <b>${PRICES[s]?money(PRICES[s].latest,PRICES[s].currency):'—'}</b></button><button data-bookmark="${esc(s)}" aria-label="Remove ${esc(s)} bookmark" ${workspaceBusy?'disabled':''}>×</button></span>`).join('')||'<span class="muted">Tap a star to bookmark a stock.</span>';renderAccount();
 }
-async function refreshHome(){if(homeBusy)return;homeBusy=true;renderHome();try{for(const symbols of [HOME_ETFS,workspaceState.symbols,HOME_STOCKS,...(typeof CONTEXT_ASSETS!=='undefined'?[CONTEXT_ASSETS.map(a=>a[0])]:[])]){await loadMarketPrices(symbols);renderHome()}}finally{homeBusy=false}}
+async function refreshHome(){if(homeBusy)return;homeBusy=true;renderHome();try{for(const symbols of [HOME_ETFS,HOME_TECH_ETFS,workspaceState.symbols,HOME_STOCKS,...(typeof CONTEXT_ASSETS!=='undefined'?[CONTEXT_ASSETS.map(a=>a[0])]:[])]){await loadMarketPrices(symbols);renderHome()}}finally{homeBusy=false}}
 if(typeof window!=='undefined'){
  document.addEventListener('click',async e=>{const b=e.target.closest('[data-bookmark]');if(!b||workspaceBusy||!workspaceReady)return;const symbol=b.dataset.bookmark;await workspaceAction({kind:'watch',symbol,enabled:!workspaceState.symbols.includes(symbol)});renderHome()});
  $('#homeTickerSearch').onsubmit=e=>{e.preventDefault();openStock($('#homeTickerInput').value)};
