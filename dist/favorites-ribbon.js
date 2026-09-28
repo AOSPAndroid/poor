@@ -1,12 +1,12 @@
 'use strict';
 let favoritesSignature='',favoritesPaused=read('poor-favorites-paused',false),favoritesHoldUntil=0,favoritesHover=false,favoritesFrame=0,favoritesRemainder=0;
 function favoriteQuote(symbol,copy=false){
- const p=PRICES[symbol],delta=p?.latest>0&&p?.previousClose>0?(p.latest/p.previousClose-1)*100:null,dir=delta===null?'':delta>0?'▲':delta<0?'▼':'→';
- return `<button class="favorite-quote" data-ticker="${esc(symbol)}" ${copy?'tabindex="-1"':''} aria-label="Open ${esc(symbol)} workspace" title="${esc(p?.name||HOME_NAMES[symbol]||symbol)}"><span class="favorite-symbol"><b>${esc(symbol)}</b><small>${p?date(p.asOf)+(p.stale?' · stale':''):'Loading price'}</small></span><span class="favorite-price"><b>${p?.latest>0?money(p.latest,p.currency):'—'}</b><small class="${delta===null?'muted':delta>=0?'gain':'loss'}">${dir} ${delta===null?'Change unavailable':signed(delta)+' day'}</small></span><span class="favorite-spark" aria-hidden="true">${miniChart(p,symbol)}</span></button>`;
+ const p=displayQuote(symbol),delta=p?.latest>0&&p?.previousClose>0?(p.latest/p.previousClose-1)*100:null,dir=delta===null?'':delta>0?'▲':delta<0?'▼':'→';
+ return `<button class="favorite-quote" data-ticker="${esc(symbol)}" ${copy?'tabindex="-1"':''} aria-label="Open ${esc(symbol)} workspace" title="${esc(p?.name||HOME_NAMES[symbol]||symbol)}"><span class="favorite-symbol"><b>${esc(symbol)}</b><small>${quoteLabel(p)}</small></span><span class="favorite-price"><b>${p?.latest>0?money(p.latest,p.currency):'—'}</b><small class="${delta===null?'muted':delta>=0?'gain':'loss'}">${dir} ${delta===null?'Change unavailable':signed(delta)+' day'}</small></span><span class="favorite-spark" aria-hidden="true">${miniChart(PRICES[symbol],symbol)}</span></button>`;
 }
 function renderFavoritesRibbon(force=false){
  const el=$('#favoritesTrack'),viewport=$('#favoritesViewport');if(!el)return;
- const symbols=[...new Set(workspaceState.symbols)].filter(tickerValid),signature=JSON.stringify(symbols.map(s=>[s,PRICES[s]]));if(!force&&signature===favoritesSignature)return;favoritesSignature=signature;
+ const symbols=[...new Set(workspaceState.symbols)].filter(tickerValid),signature=JSON.stringify(symbols.map(s=>[s,displayQuote(s)]));if(!force&&signature===favoritesSignature)return;favoritesSignature=signature;
  if(!symbols.length){el.innerHTML='<span class="favorite-empty">Star a stock or ETF to put it here.</span>';$('#favoritesMotion').hidden=true;return}
  $('#favoritesMotion').hidden=false;
  // Each repeated group fills the viewport so even a short watchlist loops cleanly.

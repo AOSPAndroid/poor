@@ -56,16 +56,16 @@ function setChartOption(key,value){if(key==='buys')showBuyMarkers=value;if(key==
 
 
 function renderTerminal(){
- const p=PRICES[marketSymbol],records=stockRecords(),buyers=new Set(records.filter(r=>r.type==='Purchase').map(r=>r.person)),groups=clusters().filter(g=>g.ticker===marketSymbol);
+ const p=displayQuote(marketSymbol),records=stockRecords(),buyers=new Set(records.filter(r=>r.type==='Purchase').map(r=>r.person)),groups=clusters().filter(g=>g.ticker===marketSymbol);
  $('#terminalResearchMap').dataset.map=marketSymbol;$('#openStockMap').title='Open '+marketSymbol+' research map (Ctrl+M)';
  $('#stockSymbol').textContent=marketSymbol;$('#stockCompany').textContent=p?.name||records[0]?.company||marketSymbol;
  $('#stockPrice').textContent=p?money(p.latest,p.currency):'—';
  const change=p?.previousClose?(p.latest/p.previousClose-1)*100:null;
  $('#stockDayChange').textContent=change===null?'Daily change unavailable':signed(change)+' day';$('#stockDayChange').className=change===null?'muted':change>=0?'gain':'loss';
- $('#stockAsOf').textContent=p?`Close ${date(p.asOf)} · ${p.exchange||'Yahoo Finance'}${p.stale?' · stale':''}`:'Fetching market data…';
+ $('#stockAsOf').textContent=p?quoteLabel(p)+' · Yahoo Finance':'Fetching market data…';
  $('#watchStock').textContent=workspaceState.symbols.includes(marketSymbol)?'★ Watching':'☆ Watch';$('#watchStock').disabled=!workspaceReady;
  $('#stockMetrics').innerHTML=[['Day range',p?.low&&p?.high?money(p.low,p.currency)+'–'+money(p.high,p.currency):'—'],['52-week range',p?.low52&&p?.high52?money(p.low52,p.currency)+'–'+money(p.high52,p.currency):'—'],['Volume',number(p?.volume)],['Buying households',buyers.size],['Shared-buy windows',groups.length]].map(([k,v])=>`<div><small>${k}</small><strong>${esc(v)}</strong></div>`).join('');
- $('#stockWatchlist').innerHTML=workspaceState.symbols.map(s=>{const q=PRICES[s],n=q?.previousClose?(q.latest/q.previousClose-1)*100:null;return `<button data-ticker="${s}" class="watch-row ${s===marketSymbol?'selected':''}"><b>${s}</b><span>${q?money(q.latest,q.currency):'—'}</span><small class="${n===null?'muted':n>=0?'gain':'loss'}">${n===null?'daily close':signed(n)}</small></button>`}).join('')||'<p class="muted">Search a ticker and choose Watch.</p>';
+ $('#stockWatchlist').innerHTML=workspaceState.symbols.map(s=>{const q=displayQuote(s),n=q?.previousClose?(q.latest/q.previousClose-1)*100:null;return `<button data-ticker="${s}" class="watch-row ${s===marketSymbol?'selected':''}"><b>${s}</b><span>${q?money(q.latest,q.currency):'—'}</span><small class="${n===null?'muted':n>=0?'gain':'loss'}">${n===null?'daily close':signed(n)}</small></button>`}).join('')||'<p class="muted">Search a ticker and choose Watch.</p>';
  $('#stockTradeCount').textContent=records.length+' loaded disclosures';
  $('#stockTrades').innerHTML=records.slice(0,40).map(r=>`<tr><td><button class="text-button" data-profile="${esc(r.person)}">${esc(r.person)}</button>${typeof ratingBadge==='function'?ratingBadge(r.person):''}<small>${esc(r.owner)}</small></td><td><span class="type-badge ${r.type.toLowerCase()}">${esc(r.type)}</span><small>${esc(r.asset)}</small></td><td><small>${transactionLabel(r)}</small>${date(r.traded)}</td><td><small>Disclosed on</small>${disclosedDate(r)?date(disclosedDate(r)):'Unknown'}<small>${disclosureDelay(r)!==null?disclosureDelay(r)+'d gap':'Signed '+date(r.filed)}</small></td><td>${esc(r.amount)}</td><td><span class="${(priceReturn(r)?.pct||0)>=0?'gain':'loss'}">${priceReturn(r)?percent(priceReturn(r)):'—'}</span><small>since trade${r.asset==='Call options'?' · stock only':''}</small></td><td><button class="row-details" data-detail="${esc(r.id)}">Details</button></td></tr>`).join('')||'<tr><td colspan="7" class="empty">No political disclosures for this ticker in the loaded feeds.</td></tr>';
  $('#signalSummary').innerHTML=groups.slice(0,3).map(g=>`<button class="signal-item" data-cluster="${clusters().indexOf(g)}"><strong>${g.count} households bought ${esc(g.ticker)}</strong><small>${date(g.start)}–${date(g.end)}</small></button>`).join('')||'<p class="muted">No multi-household buying window in the loaded records.</p>';
@@ -77,6 +77,7 @@ async function openStock(symbol,push=true){
  symbol=String(symbol).trim().toUpperCase();if(!tickerValid(symbol)){notify('Enter a valid ticker, such as BE or AAPL');return}
  if(marketSymbol!==symbol)inspectedDate=null;marketSymbol=symbol;const ticket=++marketRequest;changeView('market');renderTerminal();
  if(push&&typeof history!=='undefined')history.pushState(null,'','#stock/'+symbol);
+ if(typeof refreshCurrentQuotes==='function'&&document.querySelector('#quoteStatus'))refreshCurrentQuotes();
  // Prices render independently: a slow news feed must never hold the chart open.
  const prices=loadMarketPrices([symbol,'SPY']).then(()=>{if(ticket===marketRequest)renderTerminal()});
  const news=getLiveJSON('/api/news?symbol='+encodeURIComponent(symbol)).then(r=>{marketNews.set(symbol,r.value?{...r.value,stale:r.stale}:{error:true})}).catch(()=>marketNews.set(symbol,{error:true})).finally(()=>{if(ticket===marketRequest)renderTerminal()});

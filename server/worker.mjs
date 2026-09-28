@@ -86,6 +86,13 @@ export function newsRows(xml){
  return items.filter(i=>i.title&&i.url.startsWith('https://')&&!isNaN(Date.parse(i.published)));
 }
 async function pricesFor(env,symbol){return cached(env,'prices-v4/'+symbol,15*60000,async()=>chartPrices(await fetchJSON(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=5y&interval=1d`),symbol))}
+export function currentQuote(raw,symbol,now=Date.now()){
+ const r=raw.chart?.result?.[0],m=r?.meta,t=m?.regularMarketTime*1000;
+ if(m?.symbol!==symbol||!(m.regularMarketPrice>0)||!Number.isFinite(m.regularMarketPrice)||!m.currency||!Number.isFinite(t)||t>now+60000)throw Error('Current quote unavailable');
+ const session=m.currentTradingPeriod?.regular,start=session?.start*1000,end=session?.end*1000,previous=m.chartPreviousClose;
+ return {symbol,latest:m.regularMarketPrice,currency:m.currency,quoteAt:new Date(t).toISOString(),asOf:new Date(t).toISOString().slice(0,10),previousClose:Number.isFinite(previous)&&previous>0?previous:null,marketOpen:Number.isFinite(start)&&Number.isFinite(end)&&now>=start&&now<end,delayed:now>=start&&now<end&&now-t>120000,high:m.regularMarketDayHigh??null,low:m.regularMarketDayLow??null,volume:m.regularMarketVolume??null,source:`https://finance.yahoo.com/quote/${encodeURIComponent(symbol)}/`};
+}
+async function quoteFor(env,symbol,refresh=false){return cached(env,'quotes-v1/'+symbol,refresh?0:20000,async()=>currentQuote(await fetchJSON(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1m`),symbol))}
 const DEFAULT_WATCH=['BE','INTC','NVDA','SPY'];
 export function validateWorkspaceAction(action){
  if(!action||!['watch','rule','deleteRule','readAlerts','researchPriority','followPolitician','importFollows','portfolioSave','portfolioDelete'].includes(action.kind))throw Error('Unknown action');
@@ -208,6 +215,11 @@ export default {async fetch(request,env){
   if(url.pathname==='/api/news'){
    const symbol=url.searchParams.get('symbol');if(!symbolOK(symbol))return json({error:'Invalid ticker'},400);
    return json(await cached(env,'news/'+symbol,HOUR,async()=>({items:newsRows((await fetchText(`https://feeds.finance.yahoo.com/rss/2.0/headline?s=${encodeURIComponent(symbol)}&region=US&lang=en-US`,1000000)).text),source:'Yahoo Finance RSS'})));
+  }
+  if(url.pathname==='/api/quotes'){
+   const symbols=[...new Set((url.searchParams.get('symbols')||'').split(','))];
+   if(!symbols.length||symbols.length>6||symbols.some(s=>!symbolOK(s)))return json({error:'Use 1–6 valid ticker symbols'},400);
+   const results={};await Promise.all(symbols.map(async s=>{results[s]=await quoteFor(env,s,url.searchParams.get('refresh')==='1')}));return json(results);
   }
   if(url.pathname==='/api/prices'){
    const symbols=[...new Set((url.searchParams.get('symbols')||'').split(','))];
