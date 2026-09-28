@@ -5,7 +5,7 @@ function sourceGroup(r){let source;try{source=decodeURIComponent(r.source).toLow
 function rebuildLiveData(){
  const seedGroups=new Set(SEED.map(sourceGroup)),seen=new Set();
  const feedRows=Object.values(liveFeeds).flat().filter(r=>!seedGroups.has(sourceGroup(r)));
- signalData=[...SEED,...feedRows].filter(r=>r.quality!=='User-provided').filter((r,i,rows)=>rows.findIndex(x=>x.id===r.id)===i);
+ const signalIds=new Set();signalData=[...SEED,...feedRows].filter(r=>{if(r.quality==='User-provided'||signalIds.has(r.id))return false;signalIds.add(r.id);return true});
  data=selectedRecords([...SEED,...feedRows,...imported]).filter(r=>{if(seen.has(r.id))return false;seen.add(r.id);return true});render();if(typeof renderPeopleMap==='function'&&view==='map'&&mapMode==='people')renderPeopleMap();
 }
 function liveStatusView(){
@@ -17,10 +17,11 @@ function liveStatusView(){
  $('.price-note').textContent=`Prices ${good.length}/${total} checked${priceBusy?' · Updating…':failed?' · '+failed+' unavailable':''} · dates per row`;
  $('#feedStatus').innerHTML=sources.map(([name,s])=>`<p><strong>${name==='congress'?'CongressInvests':'Trump · Open Cabinet'}</strong> · ${s.error?'Update failed; saved data':s.providerStale?'Provider data stale':s.stale?'Saved data':'Connected'}<br>Last success: ${esc(stamp(s.checkedAt))} · Provider updated: ${esc(stamp(s.value?.sourceUpdatedAt))}<br>${esc(dateText(s.value?.coverage||'Using selected historical records.'))} ${s.value?`${s.value.rows.length} loaded; ${s.value.skipped||0} unsupported rows omitted.`:''}</p>`).join('')+`<p>Prices: ${good.length}/${total} symbols checked this session${failed?`; ${failed} unavailable`:''}. Each row shows its latest completed closing date. If a refresh fails, older prices remain labeled with their actual dates.</p>`;
 }
-async function getLiveJSON(url){const r=await fetch(url,{cache:'no-store',signal:AbortSignal.timeout(60000)});if(!r.ok)throw Error('Update unavailable');return r.json()}
+const liveRequests=new Map();
+function getLiveJSON(url){if(liveRequests.has(url))return liveRequests.get(url);const pending=(async()=>{const r=await fetch(url,{cache:'no-store',signal:AbortSignal.timeout(60000)});if(!r.ok)throw Error('Update unavailable');return r.json()})().finally(()=>liveRequests.delete(url));liveRequests.set(url,pending);return pending}
 async function refreshPrices(){
  if(priceBusy)return;priceBusy=true;liveStatusView();
- const symbols=[...new Set([...filtered(),...data].filter(r=>r.type!=='Sale'&&/^[A-Z][A-Z0-9.-]{0,11}$/.test(r.ticker)).map(r=>r.ticker))];
+ const symbols=[...new Set([...filtered(),...data].filter(r=>r.type!=='Sale'&&/^[A-Z][A-Z0-9.-]{0,11}$/.test(r.ticker)).map(r=>r.ticker))].filter(s=>{const p=PRICES[s],checked=Math.max(Date.parse(p?.checkedAt)||0,typeof marketHistorySuccess!=='undefined'?marketHistorySuccess.get(s)||0:0);if(p?.latest>0&&!p.stale&&!p.error&&Object.keys(p.closes||{}).length>=10&&Date.now()-checked<5*60000){priceChecks.set(s,{checkedAt:p.checkedAt,error:false});return false}return true});
  for(let i=0;i<symbols.length;i+=6){
   const batch=symbols.slice(i,i+6);
   try{const values=await getLiveJSON('/api/prices?symbols='+encodeURIComponent(batch.join(',')));

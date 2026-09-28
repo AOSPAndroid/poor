@@ -2,7 +2,8 @@
 let marketSymbol='BE',marketRange='6M',markerMode='traded',showBenchmark=true,marketRequest=0;
 let workspaceState={symbols:['BE','INTC','NVDA','SPY'],rules:[],alerts:[],readAt:0},workspaceReady=false,workspaceBusy=false;
 const chartPreferences=read('poor-chart-options',{});let showBuyMarkers=chartPreferences?.buys!==false,showDisclosureMarkers=chartPreferences?.disclosures!==false;showBenchmark=chartPreferences?.benchmark!==false;let showSaleMarkers=chartPreferences?.sales!==false,showChartLabels=chartPreferences?.labels!==false,showChartActivity=chartPreferences?.activity!==false;
-const marketHistoryState=new Map(),marketHistoryRequests=new Map();
+const marketHistoryState=new Map(),marketHistoryRequests=new Map(),marketHistorySuccess=new Map();let marketHomePaint=0;
+function scheduleHomePricePaint(){if(view!=='home'||marketHomePaint||typeof requestAnimationFrame!=='function')return;marketHomePaint=requestAnimationFrame(()=>{marketHomePaint=0;if(view==='home'&&typeof renderHome==='function')renderHome()})}
 const marketNews=new Map();let plottedPoints=[],chartGeometry=null,inspectedDate=null;
 const tickerValid=s=>/^[A-Z][A-Z0-9.-]{0,11}$/.test(s);
 const signed=n=>(n>=0?'+':'')+n.toFixed(2)+'%';
@@ -85,6 +86,8 @@ async function loadMarketPrices(symbols){
  const unique=[...new Set(symbols)].filter(tickerValid);
  for(let i=0;i<unique.length;i+=6){await Promise.all(unique.slice(i,i+6).map(s=>{
   if(marketHistoryRequests.has(s))return marketHistoryRequests.get(s);
+  const checked=Math.max(marketHistorySuccess.get(s)||0,Date.parse(PRICES[s]?.checkedAt)||0);
+  if(PRICES[s]?.latest>0&&Object.keys(PRICES[s].closes||{}).length>=10&&!PRICES[s].stale&&!PRICES[s].error&&Date.now()-checked<5*60000){marketHistoryState.set(s,'ready');return Promise.resolve()}
   marketHistoryState.set(s,'loading');
   const request=(async()=>{try{
    let r;for(let attempt=0;attempt<3;attempt++){
@@ -94,8 +97,9 @@ async function loadMarketPrices(symbols){
    }
    if(!(r?.value?.latest>0)||!r.value.closes)throw Error('History unavailable');
    PRICES[s]={...r.value,stale:!!r.stale,checkedAt:r.checkedAt};
+   if(!r.stale&&!r.error)marketHistorySuccess.set(s,Date.now());
    marketHistoryState.set(s,Object.keys(r.value.closes).length>=10?'ready':'error');
-  }catch{marketHistoryState.set(s,'error')}finally{marketHistoryRequests.delete(s);if(view==='market'&&s===marketSymbol)renderTerminal()}})();
+  }catch{marketHistoryState.set(s,'error')}finally{marketHistoryRequests.delete(s);if(view==='market'&&s===marketSymbol)renderTerminal();scheduleHomePricePaint()}})();
   marketHistoryRequests.set(s,request);return request;
  }));}
  if(typeof refreshRatingBadges==='function')refreshRatingBadges();

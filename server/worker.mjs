@@ -205,7 +205,9 @@ export default {async fetch(request,env){
   }
   if(url.pathname.startsWith('/api/'))return json({error:'Not found'},404);
   const file=FILES[url.pathname==='/'?'/index.html':url.pathname];if(!file)return new Response('Not found',{status:404});
-  return new Response(request.method==='HEAD'?null:file.body,{headers:{'Content-Type':file.type,'Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'}});
+  const headers={'Content-Type':file.type,'Cache-Control':file.immutable?'public, max-age=31536000, immutable':'no-cache','X-Content-Type-Options':'nosniff',ETag:file.etag};
+  if(request.headers.get('If-None-Match')===file.etag)return new Response(null,{status:304,headers});
+  return new Response(request.method==='HEAD'?null:file.body,{headers});
  }catch(error){console.error('poor request failed',url.pathname,error.message);return json({error:'Service temporarily unavailable; saved data remains visible.'},503)}
 }};
 

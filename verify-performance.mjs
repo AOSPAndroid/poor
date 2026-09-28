@@ -1,0 +1,16 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
+const terminal=fs.readFileSync('dist/terminal.js','utf8');
+let now=Date.now(),calls=0,stale=false;
+const prices={},ctx={PRICES:prices,Date:class extends Date{static now(){return now}},marketHistoryRequests:new Map(),marketHistoryState:new Map(),marketHistorySuccess:new Map(),tickerValid:s=>/^[A-Z]+$/.test(s),view:'home',scheduleHomePricePaint:()=>{},refreshRatingBadges:()=>{},getLiveJSON:async()=>{calls++;await Promise.resolve();return {BE:{value:{latest:12,closes:Object.fromEntries(Array.from({length:12},(_,i)=>['2026-09-'+String(i+1).padStart(2,'0'),10+i]))},stale}}}};
+vm.createContext(ctx);vm.runInContext(terminal.slice(terminal.indexOf('async function loadMarketPrices'),terminal.indexOf('let workspaceQueue')),ctx);
+await Promise.all([ctx.loadMarketPrices(['BE']),ctx.loadMarketPrices(['BE','BE'])]);assert.equal(calls,1);
+await ctx.loadMarketPrices(['BE']);assert.equal(calls,1);
+now+=300001;await ctx.loadMarketPrices(['BE']);assert.equal(calls,2);
+prices.BE.stale=true;stale=true;await ctx.loadMarketPrices(['BE']);assert.equal(calls,3);await ctx.loadMarketPrices(['BE']);assert.equal(calls,4);
+const live=fs.readFileSync('dist/live.js','utf8');let network=0,fail=false;
+const net={AbortSignal,fetch:async()=>{network++;await Promise.resolve();return {ok:!fail,json:async()=>({value:1})}}};vm.createContext(net);vm.runInContext(live.slice(live.indexOf('const liveRequests'),live.indexOf('async function refreshPrices')),net);
+await Promise.all([net.getLiveJSON('/api/test'),net.getLiveJSON('/api/test')]);assert.equal(network,1);fail=true;await assert.rejects(net.getLiveJSON('/api/test'));fail=false;await net.getLiveJSON('/api/test');assert.equal(network,3);
+const built=fs.readFileSync('dist/server/index.js','utf8'),assets=JSON.parse(built.slice('const FILES='.length,built.indexOf(';\nconst STATIC_RESEARCH_ROWS'))),html=assets['/index.html'].body,css=[...html.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)],scripts=[...html.matchAll(/<script ([^>]+)>/g)];assert.equal(css.length,1);assert(scripts.length>20);assert(scripts.every(m=>m[1].startsWith('defer src="/assets/')));for(const m of scripts){const file=assets[m[1].match(/src="([^"]+)"/)[1]];assert(file.immutable);assert(file.etag)}assert(assets[css[0][1]].immutable);
+console.log('Passed: concurrent price deduplication, five-minute reuse, expiry, stale retry, shared fetch failure recovery, one stylesheet and '+scripts.length+' ordered deferred scripts with versioned caching.');
