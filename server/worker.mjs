@@ -87,9 +87,9 @@ export function newsRows(xml){
 async function pricesFor(env,symbol){return cached(env,'prices-v4/'+symbol,15*60000,async()=>chartPrices(await fetchJSON(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=5y&interval=1d`),symbol))}
 const DEFAULT_WATCH=['BE','INTC','NVDA','SPY'];
 export function validateWorkspaceAction(action){
- if(!action||!['watch','rule','deleteRule','readAlerts'].includes(action.kind))throw Error('Unknown action');
+ if(!action||!['watch','rule','deleteRule','readAlerts','researchPriority'].includes(action.kind))throw Error('Unknown action');
  if(['watch','rule'].includes(action.kind)&&!symbolOK(action.symbol))throw Error('Invalid ticker');
- if(action.kind==='watch'&&typeof action.enabled!=='boolean')throw Error('Invalid watch setting');
+ if(['watch','researchPriority'].includes(action.kind)&&typeof action.enabled!=='boolean')throw Error('Invalid watch setting');
  if(action.kind==='rule'&&(!['priceAbove','priceBelow','filings','cluster'].includes(action.type)||(['priceAbove','priceBelow'].includes(action.type)&&!(Number.isFinite(action.threshold)&&action.threshold>0&&action.threshold<1e9))))throw Error('Invalid alert rule');
  if(action.kind==='deleteRule'&&(typeof action.id!=='string'||action.id.length>100))throw Error('Invalid rule');
 }
@@ -126,6 +126,7 @@ async function workspace(request,env){
  for(let attempt=0;attempt<3;attempt++){
   const object=await env.BUCKET.get(key),state=object?await object.json():{symbols:DEFAULT_WATCH.slice(),rules:[],alerts:[],readAt:0,evaluatedAt:0};
   state.alerts=state.alerts.map(a=>({...a,detail:a.detail?.replace(/Newly observed by PIF/g,'Newly observed by poor')}));
+  if(action?.kind==='researchPriority'){if(!user)return json({error:'Sign in to prioritize favorites'},401);state.researchPriority=action.enabled;}
   if(action?.kind==='watch'){state.symbols=action.enabled?[...new Set([...state.symbols,action.symbol])]:state.symbols.filter(s=>s!==action.symbol);if(state.symbols.length>30)return json({error:'Watch up to 30 stocks'},400)}
   if(action?.kind==='rule'){
    if(state.rules.length>=20)return json({error:'Use up to 20 alert rules'},400);
@@ -142,6 +143,7 @@ async function workspace(request,env){
   }
   const saved=await env.BUCKET.put(key,JSON.stringify(state),{onlyIf:object?{etagMatches:object.etag}:{etagDoesNotMatch:'*'}});
   if(!saved)continue;
+  if(user&&action&&['watch','researchPriority'].includes(action.kind))await env.BUCKET.put('poor/research/priorities/'+accountKey,JSON.stringify({symbols:state.researchPriority?state.symbols:[],updatedAt:Date.now()}));
   const response=json({...state,user});if(!user)response.headers.set('Set-Cookie',`__Host-pif_session=${id}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=31536000`);return response;
  }
  return json({error:'Workspace changed; retry'},409);
@@ -173,6 +175,7 @@ export default {async fetch(request,env){
  if(url.pathname==='/api/workspace'&&['GET','POST'].includes(request.method)){try{return await workspace(request,env)}catch(error){console.error('Workspace failure',error.message);return json({error:'Workspace temporarily unavailable'},503)}}
  if(!['GET','HEAD'].includes(request.method))return json({error:'Method not allowed'},405);
  try{
+  if(url.pathname==='/api/research/priorities'){if(!env.RESEARCH_INGEST_TOKEN||request.headers.get('Authorization')!=='Bearer '+env.RESEARCH_INGEST_TOKEN)return json({error:'Unauthorized'},401);const list=await env.BUCKET.list({prefix:'poor/research/priorities/',limit:200}),symbols=new Set();for(const item of list.objects){const o=await env.BUCKET.get(item.key);if(o){const p=await o.json();for(const s of p.symbols||[])if(symbolOK(s))symbols.add(s)}}return json({symbols:[...symbols].sort(),truncated:!!list.truncated});}
   if(url.pathname.startsWith('/api/research')){const result=await researchRoute(url,env,cached,pricesFor);return json(result,result.error?400:200)}
   if(url.pathname==='/api/feed/congress')return json(await cached(env,'congress-universe-v4',6*HOUR,()=>trackedRosterFeed(env)));
   if(url.pathname==='/api/feed/executive')return json(await cached(env,'executive',6*HOUR,async()=>{const raw=await fetchText(CABINET_URL,24000000);return executiveRows(cabinetCSV(raw.text,raw.modified))}));

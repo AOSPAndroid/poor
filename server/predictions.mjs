@@ -21,8 +21,10 @@ async function pmBrowse(env,cached){
   return {markets:events.flatMap(e=>(e.markets||[]).map(m=>normalizePrediction(m,e))).filter(m=>m?.active).sort((a,b)=>(b.volume||0)-(a.volume||0)).slice(0,100),coverage:'Up to 100 open Yes/No contracts across 40 high-volume political events. Not every Polymarket contract.'};
  });
  const obj=await env.BUCKET.get('poor/research/news'),archive=obj?await obj.json():null,news=(archive?.editions||[]).flatMap(e=>e.items||[]).filter(a=>Date.parse(a.date)>Date.now()-21*86400000).slice(0,80);
+ const activityObj=await env.BUCKET.get('poor/research/activity-index'),activity=activityObj?(await activityObj.json()).items:[];
+ const caseFor=m=>activity.find(i=>i.type==='contract'&&i.target===m.id&&i.phase==='finding'&&i.rules===m.rules&&Date.now()-Date.parse(i.publishedAt)<3*86400000);
  const saved=await env.BUCKET.get('poor/predictions/insights-v1'),insights=saved?await saved.json():{items:[]};
- return {...data,researchStatus:insights.status||'Not checked yet',researchCheckedAt:insights.checkedAt||null,value:data.value?{...data.value,markets:predictionConnections(data.value.markets,news).map(m=>({...m,insight:insights.items.find(i=>i.marketId===m.id&&i.rules===m.rules&&Date.now()-Date.parse(i.createdAt)<3*86400000)||null}))}:null};
+ return {...data,researchStatus:insights.status||'Not checked yet',researchCheckedAt:insights.checkedAt||null,value:data.value?{...data.value,markets:predictionConnections(data.value.markets,news).map(m=>({...m,investigation:caseFor(m)||null,challenge:activity.find(i=>i.id===caseFor(m)?.id&&i.phase==='challenge')||null,insight:insights.items.find(i=>i.marketId===m.id&&i.rules===m.rules&&Date.now()-Date.parse(i.createdAt)<3*86400000)||null}))}:null};
 }
 export function validPredictionInsight(x){return x&&/^\d{1,20}$/.test(x.marketId)&&['thesis','against','pricedIn','watch'].every(k=>typeof x[k]==='string'&&x[k].trim().length>=10&&x[k].length<=650)&&typeof x.rules==='string'&&x.rules.length<=16000&&Array.isArray(x.sources)&&x.sources.length>=2&&x.sources.length<=4&&x.sources.every(u=>typeof u==='string'&&u.length<1500&&pmHTTPS(u))&&x.sources.some(u=>!/(^|\.)(polymarket\.com|x\.com|twitter\.com)$/.test(new URL(u).hostname))}
 async function pmIngest(request,env){

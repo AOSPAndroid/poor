@@ -60,6 +60,7 @@ export async function researchRoute(url,env,cache,priceLoader){const path=url.pa
  if(path==='/api/research/status'){const o=await env.BUCKET.get('poor/research/collector');return {collector:o?await o.json():null,congressConnected:!!env.CONGRESS_API_KEY,earningsConnected:!!env.ALPHA_VANTAGE_API_KEY}}
  if(path==='/api/research/politics'){const feed=await readResearch(env,'pif/v1/congress-universe-v4');return {value:{rows:mapPoliticalRows(feed),coverage:'Curated source records plus loaded feed; original provenance retained'}};}
  if(path==='/api/research/daily')return dailyArchive(env);
+ if(path==='/api/research/activity')return {items:(await readResearch(env,'poor/research/activity-index'))?.items||[],status:await readResearch(env,'poor/research/pipeline-status')};
  if(path==='/api/research/scorecard')return cache(env,'research-scorecard-v1',15*60000,()=>researchScorecard(env,priceLoader));
  if(path==='/api/research/performance')return articlePerformance(env,url.searchParams.get('id'),priceLoader);
  const symbol=url.searchParams.get('symbol');if(!/^[A-Z][A-Z0-9.-]{0,11}$/.test(symbol||''))return {error:'Invalid ticker'};
@@ -107,6 +108,8 @@ export async function researchIngest(request,env){
  const token=request.headers.get('Authorization');if(!env.RESEARCH_INGEST_TOKEN||token!=='Bearer '+env.RESEARCH_INGEST_TOKEN)return {status:401,body:{error:'Unauthorized'}};
  if(!(request.headers.get('Content-Type')||'').startsWith('application/json'))return {status:415,body:{error:'JSON required'}};const text=await request.text();if(text.length>100000)return {status:413,body:{error:'Too large'}};let b;try{b=JSON.parse(text)}catch{return {status:400,body:{error:'Invalid JSON'}}}
  if(b.kind==='news')return ingestNews(b,env);
+ if(b.kind==='investigation')return ingestInvestigation(b,env);
+ if(b.kind==='pipeline-status'){if(!Number.isInteger(b.investigations)||b.investigations<0||b.investigations>3||!Number.isInteger(b.challenges)||b.challenges<0||b.challenges>2)return {status:400,body:{error:'Invalid budget'}};await env.BUCKET.put('poor/research/pipeline-status',JSON.stringify({checkedAt:new Date().toISOString(),investigations:b.investigations,challenges:b.challenges,status:String(b.status||'').slice(0,250)}));return {status:200,body:{ok:true}};}
  if(b.kind==='review-status'){await env.BUCKET.put('poor/research/reviewer-status',JSON.stringify({checkedAt:new Date().toISOString(),status:String(b.status||'').slice(0,200)}));return {status:200,body:{ok:true}};}
  if(b.kind==='review')return ingestReview(b,env);
  if(b.kind==='daily'){
@@ -242,4 +245,18 @@ async function researchScorecard(env,priceLoader){
   rows.push({...row,lastReview:a.reviews?.at(-1)?.verdict||'Pending'});
  }
  return {status:'Edge not established',protocol:'research-v1',updatedAt:new Date().toISOString(),registered:registered.length,legacy:all.length-registered.length,omitted:Math.max(0,registered.length-selected.length),summary:summarizeResearchOutcomes(rows),rows:rows.reverse(),method:'New explicitly long research theses only; primary USD stock/ETF, first close strictly after publication UTC date, exit 20 S&P 500 proxy sessions later. Fixed 10 basis points per side; stress case 25 per side. Same-date SPY price-return comparison with the same cost assumption. Completed observations are frozen; losses and invalidated theses remain. Research outcomes are not executed trades. Entry triggers are not simulated. No dividends, taxes, intraday stops or options. Overlapping theses are not independent; averages are not portfolio returns. Legacy articles and watch-only theses do not enter return statistics.'};
+}
+export function validInvestigation(b){
+ const x=b.item;return x&&/^[a-f0-9]{24}$/.test(x.id)&&['stock','contract','briefing'].includes(x.type)&&['finding','challenge'].includes(x.phase)&&['supported','wait','rejected','unverified'].includes(x.verdict)&&typeof x.target==='string'&&(x.type==='stock'?/^[A-Z][A-Z0-9.-]{0,11}$/.test(x.target):x.type==='contract'?/^\d{1,20}$/.test(x.target):x.target==='daily')&&['title','whyNow','entry','risk','nextCheck','reason'].every(k=>typeof x[k]==='string'&&x[k].trim()&&x[k].length<=400)&&Array.isArray(x.sources)&&x.sources.length<=5&&x.sources.every(u=>{try{const v=new URL(u);return u.length<1500&&v.protocol==='https:'&&!v.username&&!v.password}catch{return false}})&&(x.verdict==='unverified'||x.sources.some(u=>!/(^|\.)(x\.com|twitter\.com|polymarket\.com)$/.test(new URL(u).hostname)))&&typeof x.fingerprint==='string'&&/^[a-f0-9]{64}$/.test(x.fingerprint)&&(!x.attempt||/^[a-f0-9]{24}$/.test(x.attempt))&&(!x.rules||typeof x.rules==='string'&&x.rules.length<=16000);
+}
+async function ingestInvestigation(b,env){
+ if(!validInvestigation(b))return {status:400,body:{error:'Invalid investigation'}};
+ const x=b.item,key='poor/research/investigations/'+x.id+'/'+x.phase+(x.phase==='challenge'?'/'+(x.attempt||'initial'):'');
+ const prior=await readResearch(env,key);if(prior)return {status:200,body:{ok:true,duplicate:true}};
+ const finding=x.phase==='challenge'?await readResearch(env,'poor/research/investigations/'+x.id+'/finding'):null;
+ if(x.phase==='challenge'&&(!finding||finding.target!==x.target||finding.fingerprint!==x.fingerprint||finding.rules!==x.rules))return {status:400,body:{error:'Challenge must match the original case'}};
+ const item=Object.fromEntries(['id','type','target','phase','verdict','title','whyNow','entry','risk','nextCheck','reason','sources','fingerprint','rules','attempt'].filter(k=>x[k]!==undefined).map(k=>[k,x[k]]));item.publishedAt=new Date().toISOString();
+ await env.BUCKET.put(key,JSON.stringify(item));
+ const index=await readResearch(env,'poor/research/activity-index')||{items:[]};index.items=[item,...index.items.filter(i=>i.id!==item.id||i.phase!==item.phase||i.attempt!==item.attempt)].slice(0,150);await env.BUCKET.put('poor/research/activity-index',JSON.stringify(index));
+ return {status:200,body:{ok:true}};
 }

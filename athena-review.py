@@ -62,8 +62,5 @@ def run(force=False):
     print(status)
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('--refresh',action='store_true');p.add_argument('--check',action='store_true');args=p.parse_args()
-    if args.check:
-        result,_=invoke('Do not call any tools. Return ONLY JSON {"ready":true}.',30,2)
-        print('Athena research connection ready' if result.get('ready') is True else 'Athena did not return the expected response')
-    else:run(args.refresh)
+    from investigations import run
+    run()

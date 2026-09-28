@@ -50,5 +50,5 @@ def run(refresh=False):
     print('Prediction research: '+status+'; published '+str(result.get('published',0)))
 
 if __name__=='__main__':
-    import argparse
-    parser=argparse.ArgumentParser();parser.add_argument('--refresh',action='store_true');run(parser.parse_args().refresh)
+    from investigations import run
+    run()
