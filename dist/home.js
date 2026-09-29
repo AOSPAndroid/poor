@@ -32,6 +32,16 @@ function belowPurchaseRows(rows=signalData,now=Date.now(),prices=PRICES,quote=di
   const k=x.r.person+'|'+x.r.ticker;if(seen.has(k)||(counts.get(x.r.person)||0)>=2)return false;seen.add(k);counts.set(x.r.person,(counts.get(x.r.person)||0)+1);return true;
  }).slice(0,6);
 }
+function belowPurchaseBadge(r){
+ if(!r||r.type!=='Purchase')return '';
+ const x=belowPurchaseRows([r,...signalData.filter(s=>s.type==='Sale')])[0];
+ return x?`<span class="below-purchase-badge" title="${esc(quoteLabel(x.q))} · purchase-day close ${money(x.then,x.q.currency)} · execution price unknown">${signed(x.gap)} below purchase-day close</span>`:'';
+}
+function politicianBelowSummary(person){
+ const rows=belowPurchaseRows(signalData.filter(r=>r.person===person));
+ if(!rows.length)return '';
+ return `<section class="profile-below"><h3>Below purchase-day price</h3><div>${rows.map(x=>`<button data-ticker="${esc(x.r.ticker)}"><b>${esc(x.r.ticker)}</b> <span class="loss">${signed(x.gap)}</span><small>${money(x.q.latest,x.q.currency)} vs ${money(x.then,x.q.currency)} purchase-day close</small></button>`).join('')}</div><small>Recent disclosed buys · no later sale found · research leads, not actual losses.</small></section>`;
+}
 function renderBelowPurchases(){
  const host=$('#homeBelowPurchases');if(!host)return;
  host.innerHTML=belowPurchaseRows().map(({r,q,then,gap,priority,rating})=>`<article class="below-buy-card"><header><button data-ticker="${esc(r.ticker)}"><b>${esc(r.ticker)}</b></button><strong class="loss">${signed(gap)}</strong></header><div class="below-buy-person"><button data-profile="${esc(r.person)}">${esc(r.person)}</button><small class="${priority?'gain':'muted'}">${rating?.score!=null?rating.score+'/100 · '+esc(rating.label||'Track record')+(rating.stale?' · stale':''):'Track record unassessed'}</small></div><div class="below-buy-prices"><span><small>Latest</small><b ${quoteNumberAttrs('below:'+r.ticker,q.latest)}>${money(q.latest,q.currency)}</b></span><span><small>Purchase-day close</small><b>${money(then,q.currency)}</b></span></div><small>${esc(quoteLabel(q))}</small><p>${esc(r.amount)} · ${esc(r.owner||'Owner unspecified')}<br>Bought ${date(r.traded)}<br>Disclosed ${date(disclosedDate(r))}</p><footer><button data-ticker="${esc(r.ticker)}">Chart</button><button data-map="${esc(r.ticker)}">Map</button><button data-detail="${esc(r.id)}">Filing details</button></footer></article>`).join('')||'<p class="home-caption">No qualifying purchases below their purchase-day close with fresh prices in the loaded data.</p>';
