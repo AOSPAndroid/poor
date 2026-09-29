@@ -1,0 +1,13 @@
+import fs from 'node:fs';import vm from 'node:vm';import assert from 'node:assert/strict';
+const s=fs.readFileSync('dist/home.js','utf8'),now=Date.parse('2026-09-29T12:00:00Z');
+const prices=Object.fromEntries(['A','B','C','D','E'].map((t,i)=>[t,{currency:'USD',asOf:'2026-09-28',latest:110+i*10,closes:{'2026-08-01':1,'2026-09-02':100,'2026-09-28':110+i*10}}]));
+const rows=Object.keys(prices).map(ticker=>({ticker,person:'One',type:'Purchase',chamber:'House',asset:'Stock',quality:'Official filing',filed:'2026-09-01',traded:'2026-08-01'}));
+const ctx=vm.createContext({Date,prices,rows,now,disclosedDate:r=>r.filed});
+vm.runInContext(s.slice(s.indexOf('function followerReturn'),s.indexOf('function followerCell'))+s.slice(s.indexOf('function disclosureWinnerCandidates'),s.indexOf('function renderDisclosureWinners')),ctx);
+const result=()=>vm.runInContext('bestDisclosureRows(rows,now,prices,s=>prices[s])',ctx);
+assert.deepEqual(Array.from(result(),x=>x.r.ticker),['E','D','C','B']);assert(Math.abs(result()[0].pct-50)<1e-8);assert.equal(result()[0].entry.basisDate,'2026-09-02');
+rows.push({...rows[4],person:'Two'});assert.equal(result().filter(x=>x.r.ticker==='E').length,1);
+prices.E.stale=true;assert.equal(result()[0].r.ticker,'D');prices.E.stale=false;
+rows[4].asset='Call options';rows.at(-1).filed='2026-10-01';assert.equal(result()[0].r.ticker,'D');
+prices.D.latest=90;assert(!result().some(x=>x.r.ticker==='D'));
+console.log('Passed after-disclosure entry, top-four ranking, unique tickers, stale prices, options, future filings and losing returns.');
