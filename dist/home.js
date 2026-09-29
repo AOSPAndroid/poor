@@ -6,6 +6,7 @@ const HOME_SECTOR_SYMBOLS=[...new Set(HOME_SECTORS.flatMap(g=>g.symbols))];
 const HOME_STOCKS=['NVDA','AAPL','MSFT','AMZN','GOOG','TSLA','BE','INTC'];
 const HOME_NAMES={SPY:'S&P 500',VOO:'Vanguard S&P 500',QQQ:'Nasdaq 100',VGT:'Vanguard technology',XLK:'S&P technology sector',SOXX:'Semiconductors',DIA:'Dow Jones',IWM:'Russell 2000',TLT:'Long-term Treasuries',GLD:'Gold',NVDA:'NVIDIA',AAPL:'Apple',MSFT:'Microsoft',AMZN:'Amazon',GOOG:'Alphabet',TSLA:'Tesla',BE:'Bloom Energy',INTC:'Intel',AMD:'AMD',XLE:'Energy sector ETF',CEG:'Constellation Energy',VST:'Vistra'};
 let homeBusy=false;
+let disclosureWinnerLimit=4;
 function homeTrackPriority(person){const r=typeof politicianRating==='function'?politicianRating(person):null;return r&&r.score!==null&&!r.stale&&r.score>=55?r.score:0}
 function latestPurchases(rows=signalData,now=Date.now()){
  const today=new Date(now).toISOString().slice(0,10),cutoff=new Date(now-90*86400000).toISOString().slice(0,10),counts=new Map(),seen=new Set();
@@ -78,21 +79,25 @@ function disclosureWinnerCandidates(rows=signalData,now=Date.now()){
  const today=new Date(now).toISOString().slice(0,10),cutoff=new Date(now-180*86400000).toISOString().slice(0,10);
  return rows.filter(r=>r.type==='Purchase'&&['House','Senate'].includes(r.chamber)&&['Stock','ADR','ETF','Partnership units'].includes(r.asset)&&r.quality!=='User-provided'&&r.traded<=today&&disclosedDate(r)>=cutoff&&disclosedDate(r)<=today);
 }
-function bestDisclosureRows(rows=signalData,now=Date.now(),prices=PRICES,quote=displayQuote){
+function bestDisclosureRows(rows=signalData,now=Date.now(),prices=PRICES,quote=displayQuote,limit=4){
  const seen=new Set();
  return disclosureWinnerCandidates(rows,now).map(r=>{
   const entry=followerReturn(r,prices),q=quote(r.ticker);
   if(!entry||!q||q.error||q.stale||!(q.latest>0)||!q.asOf||q.asOf<entry.basisDate||q.currency!==prices[r.ticker]?.currency||Date.parse(q.asOf)>now||now-Date.parse(q.asOf)>5*86400000)return null;
   const pct=(q.latest/entry.then-1)*100;
   return pct>0?{r,q,entry,pct}:null;
- }).filter(Boolean).sort((a,b)=>b.pct-a.pct||disclosedDate(a.r).localeCompare(disclosedDate(b.r))).filter(x=>{if(seen.has(x.r.ticker))return false;seen.add(x.r.ticker);return true}).slice(0,4);
+ }).filter(Boolean).sort((a,b)=>b.pct-a.pct||disclosedDate(a.r).localeCompare(disclosedDate(b.r))).filter(x=>{if(seen.has(x.r.ticker))return false;seen.add(x.r.ticker);return true}).slice(0,limit);
 }
 function renderDisclosureWinners(){
  const host=$('#homeDisclosureWinners');if(!host)return;
- host.innerHTML=bestDisclosureRows().map(({r,q,entry,pct})=>{
+ const winners=bestDisclosureRows(signalData,Date.now(),PRICES,displayQuote,Infinity);
+ host.innerHTML=winners.slice(0,disclosureWinnerLimit).map(({r,q,entry,pct})=>{
   const laterSale=signalData.some(x=>x.person===r.person&&x.ticker===r.ticker&&x.type==='Sale'&&x.traded>=r.traded&&x.traded<=q.asOf&&disclosedDate(x)<=q.asOf);
-  return `<article class="below-buy-card disclosure-winner"><header><button data-ticker="${esc(r.ticker)}"><b>${esc(r.ticker)}</b></button><strong class="gain">${signed(pct)}</strong></header><small>Since first close after disclosure</small><div class="below-buy-person"><button data-profile="${esc(r.person)}">${esc(r.person)}</button></div><div class="below-buy-prices"><span><small>Latest</small><b ${quoteNumberAttrs('winner:'+r.ticker,q.latest)}>${money(q.latest,q.currency)}</b></span><span><small>Entry close</small><b>${money(entry.then,q.currency)}</b></span></div>${belowChartHTML(r,q)}<small>${esc(quoteLabel(q))}</small><p>Disclosed ${date(disclosedDate(r))}<br>Entry ${date(entry.basisDate)}${laterSale?'<br><span class="loss">Later sale disclosed</span>':''}</p><footer><button data-ticker="${esc(r.ticker)}">Chart</button><button data-map="${esc(r.ticker)}">Map</button><button data-detail="${esc(r.id)}">Filing</button></footer></article>`;
+  return `<article class="below-buy-card disclosure-winner"><header><button data-ticker="${esc(r.ticker)}"><b>${esc(r.ticker)}</b></button><strong class="gain">${signed(pct)}</strong></header><small>Since first close after disclosure</small><div class="below-buy-person winner-person"><button data-profile="${esc(r.person)}">${esc(r.person)}</button>${typeof ratingBadge==='function'?ratingBadge(r.person):'<small>Unrated</small>'}</div><div class="below-buy-prices"><span><small>Latest</small><b ${quoteNumberAttrs('winner:'+r.ticker,q.latest)}>${money(q.latest,q.currency)}</b></span><span><small>Entry close</small><b>${money(entry.then,q.currency)}</b></span></div>${belowChartHTML(r,q)}<small>${esc(quoteLabel(q))}</small><p>Disclosed ${date(disclosedDate(r))}<br>Entry ${date(entry.basisDate)}${laterSale?'<br><span class="loss">Later sale disclosed</span>':''}</p><footer><button data-ticker="${esc(r.ticker)}">Chart</button><button data-map="${esc(r.ticker)}">Map</button><button data-detail="${esc(r.id)}">Filing</button></footer></article>`;
  }).join('')||'<p class="home-caption">No positive after-disclosure returns with fresh comparable prices in the loaded data.</p>';
+ const more=$('#disclosureWinnersMore'),less=$('#disclosureWinnersLess');
+ if(more){more.hidden=winners.length<=disclosureWinnerLimit;more.textContent='Show '+Math.min(4,Math.max(0,winners.length-disclosureWinnerLimit))+' more';more.onclick=()=>{disclosureWinnerLimit+=4;renderDisclosureWinners()};}
+ if(less){less.hidden=disclosureWinnerLimit<=4;less.onclick=()=>{disclosureWinnerLimit=4;renderDisclosureWinners()};}
 }
 function renderHome(){if(typeof renderPurchasesRibbon==='function')renderPurchasesRibbon();if(typeof renderFavoritesRibbon==='function')renderFavoritesRibbon();renderSharedBuying();if(typeof renderHomeInsights==='function')renderHomeInsights();
  if(!$('#homeView'))return;renderBelowPurchases();renderDisclosureWinners();if(typeof renderContext==='function')renderContext();

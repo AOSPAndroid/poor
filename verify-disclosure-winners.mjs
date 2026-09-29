@@ -11,3 +11,8 @@ prices.E.stale=true;assert.equal(result()[0].r.ticker,'D');prices.E.stale=false;
 rows[4].asset='Call options';rows.at(-1).filed='2026-10-01';assert.equal(result()[0].r.ticker,'D');
 prices.D.latest=90;assert(!result().some(x=>x.r.ticker==='D'));
 console.log('Passed after-disclosure entry, top-four ranking, unique tickers, stale prices, options, future filings and losing returns.');
+// Expanded results preserve the same ordering and one-card-per-ticker rule.
+rows[4].asset='Stock';rows.at(-1).filed='2026-09-01';prices.D.latest=140;
+assert.equal(vm.runInContext('bestDisclosureRows(rows,now,prices,s=>prices[s],8).length',ctx),5);
+assert.equal(vm.runInContext('bestDisclosureRows(rows,now,prices,s=>prices[s],4).length',ctx),4);
+console.log('Passed expanded and collapsed ranking limits.');
