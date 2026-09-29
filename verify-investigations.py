@@ -4,6 +4,12 @@ from unittest.mock import patch
 import investigations as p
 import research_engine as e
 class Tests(unittest.TestCase):
+ def test_expanded_discovery_allowance_reaches_agent(self):
+  with patch.object(e,'invoke',return_value='{"case":{}}') as invoke,patch.object(e,'discovered_evidence',return_value=[]):
+   e.run_report('test',seconds=120,writing_seconds=90,search_limit=8)
+   self.assertIn('Maximum 8 searches',invoke.call_args_list[0].args[0])
+   self.assertEqual(invoke.call_args_list[0].args[1],120)
+   self.assertEqual(invoke.call_args_list[1].args[1],90)
  def test_collector_reserves_morning_budget_in_paris(self):
   for month,utc_hour in ((7,6),(1,7)):
    morning=datetime.datetime(2026,month,15,utc_hour,tzinfo=datetime.timezone.utc)
@@ -22,10 +28,10 @@ class Tests(unittest.TestCase):
   self.assertEqual(set(e.select_source_urls(urls,limit=4)),set(urls))
  def test_budget_persists_before_work(self):
   state={};saved=[]
-  for _ in range(3):self.assertTrue(p.reserve(state,'investigations','2026-09-28',lambda s:saved.append(dict(s))))
-  self.assertFalse(p.reserve(state,'investigations','2026-09-28',lambda s:None));self.assertEqual(len(saved),3)
+  for _ in range(8):self.assertTrue(p.reserve(state,'investigations','2026-09-28',lambda s:saved.append(dict(s))))
+  self.assertFalse(p.reserve(state,'investigations','2026-09-28',lambda s:None));self.assertEqual(len(saved),8)
   self.assertTrue(p.reserve(state,'investigations','2026-09-29',lambda s:None));self.assertEqual(state['investigations'],1)
-  for _ in range(2):self.assertTrue(p.reserve(state,'challenges','2026-09-29',lambda s:None))
+  for _ in range(8):self.assertTrue(p.reserve(state,'challenges','2026-09-29',lambda s:None))
   self.assertFalse(p.reserve(state,'challenges','2026-09-29',lambda s:None))
  def test_material_odds_and_rules(self):
   context={'rules':'Exact rule','outcomes':[{'label':'Yes','price':.4}]};a=p.changed_candidate('contract','1',context)

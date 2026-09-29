@@ -1,4 +1,4 @@
-"""Change-driven public research. Three investigations and two challenges per Paris day."""
+"""Change-driven public research. Eight investigations and eight challenges per Paris day."""
 import datetime, hashlib, importlib.util, json, os, re, time
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -9,13 +9,14 @@ from decision_checks import guidance, stock_snapshot, contract_rank, order_candi
 spec=importlib.util.spec_from_file_location('collector',Path(__file__).with_name('collect-research.py'))
 c=importlib.util.module_from_spec(spec);spec.loader.exec_module(c)
 STATE=PROFILE/'poor-investigations-v1.json'
+DAILY_LIMITS={'investigations':8,'challenges':8}
 
 def digest(value):return hashlib.sha256(json.dumps(value,sort_keys=True,ensure_ascii=False).encode()).hexdigest()
 def save(state):
     temp=STATE.with_suffix('.tmp');temp.write_text(json.dumps(state,ensure_ascii=False),encoding='utf-8');os.replace(temp,STATE)
 def reserve(state,kind,today,persist=save):
     if state.get('date')!=today:state.update(date=today,investigations=0,challenges=0)
-    limit={'investigations':3,'challenges':2}[kind]
+    limit=DAILY_LIMITS[kind]
     if state.get(kind,0)>=limit:return False
     state[kind]=state.get(kind,0)+1;persist(state);return True
 
@@ -187,7 +188,7 @@ def run(monitor_only=False,max_new=3):
                 key=candidate['type']+':'+candidate['target'];state['seen'][key]={'fingerprint':candidate['fingerprint'],'anchor':candidate['anchor'],'date':today,'caseId':candidate['id'],'ok':False};save(state)
                 ok=False;report={};allowed=set();evidence_ready=False
                 try:
-                    report,allowed=run_report(prompt_for(candidate),allowed_sources(candidate),seconds=45,max_pages=4,writing_seconds=60,verified_only=True)
+                    report,allowed=run_report(prompt_for(candidate),allowed_sources(candidate),seconds=120,max_pages=8,writing_seconds=90,verified_only=True,search_limit=8)
                     candidate=market_context(candidate,base)
                     finding=screen_case(report,validate_case(report,allowed),candidate,allowed);ok=finding['verdict']!='unverified'
                     evidence_ready=decisive_evidence_retrieved(report,finding,allowed)
@@ -216,7 +217,7 @@ def run(monitor_only=False,max_new=3):
                 case['challengeDate']=today;save(state)
                 try:
                     candidate=market_context(candidate,base)
-                    report,allowed=run_report(prompt_for(candidate,case['finding']),allowed_sources(candidate)|set(case['finding']['sources']),seconds=45,max_pages=5,profile=PROFILE.parent/'athena',verified_only=True,writing_seconds=60)
+                    report,allowed=run_report(prompt_for(candidate,case['finding']),allowed_sources(candidate)|set(case['finding']['sources']),seconds=120,max_pages=8,profile=PROFILE.parent/'athena',verified_only=True,writing_seconds=90,search_limit=8)
                     candidate=market_context(candidate,base)
                     review=screen_case(report,validate_case(report,allowed,'challenge',case['finding']),candidate,allowed,challenge=True)
                 except Exception:
@@ -228,7 +229,7 @@ def run(monitor_only=False,max_new=3):
                     except Exception:print('Activity review saved; article review will need a later check')
         status='Monitoring only; no model calls' if monitor_only else ('No material changes; existing cases retained' if not eligible else 'Changed cases checked within the daily budget; unverified cases remain visible')
         c.request(base,'/api/research/ingest',{'kind':'pipeline-status','investigations':state.get('investigations',0),'challenges':state.get('challenges',0),'status':status},token);save(state)
-        print(status+'; investigations '+str(state.get('investigations',0))+'/3; challenges '+str(state.get('challenges',0))+'/2')
+        print(status+'; investigations '+str(state.get('investigations',0))+'/'+str(DAILY_LIMITS['investigations'])+'; challenges '+str(state.get('challenges',0))+'/'+str(DAILY_LIMITS['challenges']))
     finally:lock.close()
 if __name__=='__main__':
     import argparse
