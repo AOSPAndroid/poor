@@ -16,3 +16,9 @@ prices.AAA.asOf='2026-09-01';assert.equal(run([row]).length,0);prices.AAA.asOf='
 prices.AAA.latest=110;assert.equal(run([row]).length,0);
 console.log('Passed below-purchase price math, ranking, later sales, instruments, public dates and stale-price exclusions.');
 
+
+const other={...row,person:'Other',id:'b'};
+ctx.coRows=[row,other,{...other,id:'duplicate'},{...other,person:'Old',traded:'2025-01-01'},{...other,person:'Options',asset:'Call options'},{...other,person:'Future',filed:'2026-10-01'},{...other,person:'Sold'},{...other,person:'Sold',type:'Sale',traded:'2026-09-20',filed:'2026-09-22'}];
+ctx.reference=row;
+assert.deepEqual(Array.from(vm.runInContext('belowOtherBuyers(reference,coRows,now)',ctx)),['Other']);
+console.log('Passed: distinct other buyers, exclusion of self, old buys, options, future disclosures and subsequent sales.');

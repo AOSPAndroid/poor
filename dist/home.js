@@ -32,6 +32,18 @@ function belowPurchaseRows(rows=signalData,now=Date.now(),prices=PRICES,quote=di
   const k=x.r.person+'|'+x.r.ticker;if(seen.has(k)||(counts.get(x.r.person)||0)>=2)return false;seen.add(k);counts.set(x.r.person,(counts.get(x.r.person)||0)+1);return true;
  }).slice(0,6);
 }
+function belowOtherBuyers(r,rows=signalData,now=Date.now()){
+ const cutoff=new Date(now-180*86400000).toISOString().slice(0,10);
+ return [...new Set(belowPurchaseCandidates(rows,now).filter(x=>x.ticker===r.ticker&&x.person!==r.person&&x.traded>=cutoff).map(x=>x.person))].sort((a,b)=>homeTrackPriority(b)-homeTrackPriority(a)||a.localeCompare(b));
+}
+function belowBuyersHTML(r){
+ const names=belowOtherBuyers(r);
+ return names.length?`<details class="below-buyers"><summary>${names.length} other politician${names.length===1?'':'s'} bought · 180d</summary><div>${names.map(name=>`<button data-profile="${esc(name)}">${esc(name)}</button>`).join('')}</div><small>Distinct politicians · equity buys in past 180 days · no later disclosed sale in loaded records. Not proof of coordination.</small></details>`:'<small class="below-buyers-empty">No other buyers found · past 180d</small>';
+}
+function belowChartHTML(r,q=displayQuote(r.ticker)){
+ const intraday=q?.intraday?.length>=2&&typeof liveMiniChart==='function';
+ return `<button class="below-mini-chart" data-ticker="${esc(r.ticker)}" aria-label="Open ${esc(r.ticker)} chart"><span>${intraday?'Intraday':'1M · daily closes'}</span>${intraday?liveMiniChart(r.ticker):miniChart(PRICES[r.ticker],r.ticker)}</button>`;
+}
 function belowPurchaseBadge(r){
  if(!r||r.type!=='Purchase')return '';
  const x=belowPurchaseRows([r,...signalData.filter(s=>s.type==='Sale')])[0];
@@ -40,11 +52,11 @@ function belowPurchaseBadge(r){
 function politicianBelowSummary(person){
  const rows=belowPurchaseRows(signalData.filter(r=>r.person===person));
  if(!rows.length)return '';
- return `<section class="profile-below"><h3>Below purchase-day price</h3><div>${rows.map(x=>`<button data-ticker="${esc(x.r.ticker)}"><b>${esc(x.r.ticker)}</b> <span class="loss">${signed(x.gap)}</span><small>${money(x.q.latest,x.q.currency)} vs ${money(x.then,x.q.currency)} purchase-day close</small></button>`).join('')}</div><small>Recent disclosed buys · no later sale found · research leads, not actual losses.</small></section>`;
+ return `<section class="profile-below"><h3>Below purchase-day price</h3><div>${rows.map(x=>`<article class="profile-below-item"><button data-ticker="${esc(x.r.ticker)}"><b>${esc(x.r.ticker)}</b> <span class="loss">${signed(x.gap)}</span><small>${money(x.q.latest,x.q.currency)} vs ${money(x.then,x.q.currency)} purchase-day close</small></button>${belowChartHTML(x.r,x.q)}${belowBuyersHTML(x.r)}</article>`).join('')}</div><small>Recent disclosed buys · no later sale found · research leads, not actual losses.</small></section>`;
 }
 function renderBelowPurchases(){
  const host=$('#homeBelowPurchases');if(!host)return;
- host.innerHTML=belowPurchaseRows().map(({r,q,then,gap,priority,rating})=>`<article class="below-buy-card"><header><button data-ticker="${esc(r.ticker)}"><b>${esc(r.ticker)}</b></button><strong class="loss">${signed(gap)}</strong></header><div class="below-buy-person"><button data-profile="${esc(r.person)}">${esc(r.person)}</button><small class="${priority?'gain':'muted'}">${rating?.score!=null?rating.score+'/100 · '+esc(rating.label||'Track record')+(rating.stale?' · stale':''):'Track record unassessed'}</small></div><div class="below-buy-prices"><span><small>Latest</small><b ${quoteNumberAttrs('below:'+r.ticker,q.latest)}>${money(q.latest,q.currency)}</b></span><span><small>Purchase-day close</small><b>${money(then,q.currency)}</b></span></div><small>${esc(quoteLabel(q))}</small><p>${esc(r.amount)} · ${esc(r.owner||'Owner unspecified')}<br>Bought ${date(r.traded)}<br>Disclosed ${date(disclosedDate(r))}</p><footer><button data-ticker="${esc(r.ticker)}">Chart</button><button data-map="${esc(r.ticker)}">Map</button><button data-detail="${esc(r.id)}">Filing details</button></footer></article>`).join('')||'<p class="home-caption">No qualifying purchases below their purchase-day close with fresh prices in the loaded data.</p>';
+ host.innerHTML=belowPurchaseRows().map(({r,q,then,gap,priority,rating})=>`<article class="below-buy-card"><header><button data-ticker="${esc(r.ticker)}"><b>${esc(r.ticker)}</b></button><strong class="loss">${signed(gap)}</strong></header><div class="below-buy-person"><button data-profile="${esc(r.person)}">${esc(r.person)}</button><small class="${priority?'gain':'muted'}">${rating?.score!=null?rating.score+'/100 · '+esc(rating.label||'Track record')+(rating.stale?' · stale':''):'Track record unassessed'}</small></div><div class="below-buy-prices"><span><small>Latest</small><b ${quoteNumberAttrs('below:'+r.ticker,q.latest)}>${money(q.latest,q.currency)}</b></span><span><small>Purchase-day close</small><b>${money(then,q.currency)}</b></span></div><small>${esc(quoteLabel(q))}</small>${belowChartHTML(r,q)}${belowBuyersHTML(r)}<p>${esc(r.amount)} · ${esc(r.owner||'Owner unspecified')}<br>Bought ${date(r.traded)}<br>Disclosed ${date(disclosedDate(r))}</p><footer><button data-ticker="${esc(r.ticker)}">Chart</button><button data-map="${esc(r.ticker)}">Map</button><button data-detail="${esc(r.id)}">Filing details</button></footer></article>`).join('')||'<p class="home-caption">No qualifying purchases below their purchase-day close with fresh prices in the loaded data.</p>';
 }
 function miniChart(p,symbol){const points=chartPoints(p,'1M');if(points.length<2)return '<span class="mini-empty">History unavailable</span>';const values=points.map(p=>p[1]),lo=Math.min(...values),hi=Math.max(...values),path=values.map((v,i)=>`${i?'L':'M'}${(i/(values.length-1)*160).toFixed(1)},${(37-(v-lo)/Math.max(.01,hi-lo)*32).toFixed(1)}`).join(' ');return `<svg viewBox="0 0 160 42" role="img" aria-label="${esc(symbol)} one month closing prices"><path d="${path}" fill="none" stroke="${values.at(-1)>=values[0]?'#16805a':'#bd4141'}" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>`}
 function homeQuoteFooter(p){
