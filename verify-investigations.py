@@ -1,8 +1,25 @@
 import unittest
+import datetime
 from unittest.mock import patch
 import investigations as p
 import research_engine as e
 class Tests(unittest.TestCase):
+ def test_collector_reserves_morning_budget_in_paris(self):
+  for month,utc_hour in ((7,6),(1,7)):
+   morning=datetime.datetime(2026,month,15,utc_hour,tzinfo=datetime.timezone.utc)
+   self.assertFalse(p.c.collector_monitor_only(morning))
+   self.assertTrue(p.c.collector_monitor_only(morning-datetime.timedelta(seconds=1)))
+ def test_sources_diversify_without_index_pages(self):
+  filings=['https://disclosures-clerk.house.gov/public_disc/'+str(i)+'.pdf' for i in range(5)]
+  news='https://investors.example.com/news/earnings-release'
+  contrary='https://www.sec.gov/Archives/company-risk.htm'
+  selected=e.select_source_urls(filings+[news,contrary,'https://disclosures-clerk.house.gov/FinancialDisclosure','https://x.com/tracker/status/1'],filings,4)
+  self.assertEqual(len(selected),4)
+  self.assertIn(news,selected);self.assertIn(contrary,selected)
+  self.assertEqual(len(set(selected)&set(filings)),2)
+ def test_sources_fill_remaining_slots_when_only_one_host(self):
+  urls=['https://www.sec.gov/Archives/'+str(i) for i in range(4)]
+  self.assertEqual(set(e.select_source_urls(urls,limit=4)),set(urls))
  def test_budget_persists_before_work(self):
   state={};saved=[]
   for _ in range(3):self.assertTrue(p.reserve(state,'investigations','2026-09-28',lambda s:saved.append(dict(s))))

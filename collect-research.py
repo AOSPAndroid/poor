@@ -1,11 +1,17 @@
 """poor's scheduled collector. Configuration and secrets live outside the site checkout."""
 import argparse, datetime, json, os, pathlib, re, sqlite3, subprocess, time, urllib.request
 import xml.etree.ElementTree as ET
+from zoneinfo import ZoneInfo
 PROFILE=pathlib.Path(os.environ.get('LOCALAPPDATA',str(pathlib.Path.home()/'AppData/Local')))/'hermes/profiles/poor'
 CONFIG=PROFILE/'poor-research-private.json'
 STATE=PROFILE/'poor-research-state.json'
 UNIVERSE=['BE','INTC','NVDA','AAPL','MSFT','AMZN','GOOG','TSLA','AVGO','LMT','RTX','PLTR']
 COMPANIES=dict(zip(UNIVERSE,['Bloom Energy','Intel','NVIDIA','Apple','Microsoft','Amazon','Alphabet','Tesla','Broadcom','Lockheed Martin','RTX','Palantir']))
+
+def collector_monitor_only(now=None):
+    """Reserve the new day's model budget for the 08:00 Paris research run."""
+    now=now or datetime.datetime.now(datetime.timezone.utc)
+    return now.astimezone(ZoneInfo('Europe/Paris')).hour < 8
 def collect_treasury(base,token):
     url='https://home.treasury.gov/resource-center/data-chart-center/interest-rates/pages/xml?data=daily_treasury_yield_curve&field_tdr_date_value='+str(datetime.date.today().year)
     with urllib.request.urlopen(url,timeout=40) as r:root=ET.fromstring(r.read())
@@ -169,4 +175,4 @@ if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--research',action='store_true');p.add_argument('--local',action='store_true');a=p.parse_args();run(a.research,a.local)
     if a.research and not a.local:
         from investigations import run as investigate
-        investigate()
+        investigate(monitor_only=collector_monitor_only())

@@ -16,3 +16,8 @@ Follow the JSON schema in the task. The whole reader-facing brief is a TLDR: why
 
 ## Measurement
 Preserve failed theses and original publication times. Distinguish post-disclosure returns from returns before readers could act. Research performance is a fixed-window observation, not proof that the proposed entry traded. Never cherry-pick winners or claim an edge from agreement between agents. Probabilities require a reproducible method and eventual calibration, not model confidence.
+# Scheduling and evidence allocation
+
+The daily research task runs at 08:00 Paris. Before 08:00 Paris, the six-hour collector only monitors changes; it must not spend the new day's investigation or challenge budget. The shared limits remain three investigations and two challenges per day. These are application limits, not a reading of provider credits.
+
+Use the bounded searches to connect the original event to a dated catalyst and contrary evidence. Prefer exact filings, releases and rules over portal pages. The reader gives other publishers room before filling remaining slots with one publisher. Different publishers are not automatically independent evidence: check whether they repeat the same original claim. If evidence remains insufficient, retain that limitation rather than inventing an opportunity.
