@@ -57,6 +57,7 @@ def cited_urls(session,initial,profile=None):
     return urls
 def request(base,path,body=None,token=None):
     headers={'Accept':'application/json','User-Agent':'poor scheduled research collector'}
+    if token: headers['Authorization']='Bearer '+token
     if body is not None: headers.update({'Content-Type':'application/json','Authorization':'Bearer '+token,'Origin':base})
     req=urllib.request.Request(base+path,data=json.dumps(body).encode() if body is not None else None,headers=headers)
     with urllib.request.urlopen(req,timeout=150) as r:return json.load(r)
