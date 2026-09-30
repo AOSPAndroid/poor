@@ -59,6 +59,7 @@ async function earningsResearch(env,symbol,cache){if(!env.ALPHA_VANTAGE_API_KEY)
 export async function researchRoute(url,env,cache,priceLoader){const path=url.pathname;if(path==='/api/research/treasury')return cache(env,'treasury-v1',6*RHOUR,async()=>{const year=new Date().getUTCFullYear(),xml=await researchFetch('https://home.treasury.gov/resource-center/data-chart-center/interest-rates/pages/xml?data=daily_treasury_yield_curve&field_tdr_date_value='+year);return parseTreasury(xml)});
  if(path==='/api/research/status'){const o=await env.BUCKET.get('poor/research/collector');return {collector:o?await o.json():null,congressConnected:!!env.CONGRESS_API_KEY,earningsConnected:!!env.ALPHA_VANTAGE_API_KEY}}
  if(path==='/api/research/politics'){const feed=await readResearch(env,'pif/v1/congress-universe-v4');return {value:{rows:mapPoliticalRows(feed),coverage:'Curated source records plus loaded feed; original provenance retained'}};}
+ if(path==='/api/research/analyst-targets')return analystTargetsArchive(env);
  if(path==='/api/research/daily')return dailyArchive(env);
  if(path==='/api/research/activity')return {items:(await readResearch(env,'poor/research/activity-index'))?.items||[],status:await readResearch(env,'poor/research/pipeline-status')};
  if(path==='/api/research/investigation-scorecard')return cache(env,'investigation-scorecard-v1',15*60000,()=>investigationScorecard(env));
@@ -111,9 +112,10 @@ async function ingestNews(b,env){
 export async function researchIngest(request,env){
  const token=request.headers.get('Authorization');if(!env.RESEARCH_INGEST_TOKEN||token!=='Bearer '+env.RESEARCH_INGEST_TOKEN)return {status:401,body:{error:'Unauthorized'}};
  if(!(request.headers.get('Content-Type')||'').startsWith('application/json'))return {status:415,body:{error:'JSON required'}};const text=await request.text();if(text.length>100000)return {status:413,body:{error:'Too large'}};let b;try{b=JSON.parse(text)}catch{return {status:400,body:{error:'Invalid JSON'}}}
+ if(b.kind==='analyst-targets')return ingestAnalystTargets(b,env);
  if(b.kind==='news')return ingestNews(b,env);
  if(b.kind==='investigation')return ingestInvestigation(b,env);
- if(b.kind==='pipeline-status'){if(!Number.isInteger(b.investigations)||b.investigations<0||b.investigations>3||!Number.isInteger(b.challenges)||b.challenges<0||b.challenges>2)return {status:400,body:{error:'Invalid budget'}};await env.BUCKET.put('poor/research/pipeline-status',JSON.stringify({checkedAt:new Date().toISOString(),investigations:b.investigations,challenges:b.challenges,status:String(b.status||'').slice(0,250)}));return {status:200,body:{ok:true}};}
+ if(b.kind==='pipeline-status'){if(!Number.isInteger(b.investigations)||b.investigations<0||b.investigations>8||!Number.isInteger(b.challenges)||b.challenges<0||b.challenges>8)return {status:400,body:{error:'Invalid budget'}};await env.BUCKET.put('poor/research/pipeline-status',JSON.stringify({checkedAt:new Date().toISOString(),investigations:b.investigations,challenges:b.challenges,status:String(b.status||'').slice(0,250)}));return {status:200,body:{ok:true}};}
  if(b.kind==='review-status'){await env.BUCKET.put('poor/research/reviewer-status',JSON.stringify({checkedAt:new Date().toISOString(),status:String(b.status||'').slice(0,200)}));return {status:200,body:{ok:true}};}
  if(b.kind==='review')return ingestReview(b,env);
  if(b.kind==='daily'){
@@ -322,4 +324,49 @@ async function investigationScorecard(env){
  const items=(await readResearch(env,'poor/research/activity-index'))?.items||[],findings=items.filter(a=>a.phase==='finding'&&a.type==='stock'&&a.measurement?.direction==='long');
  const rows=[];for(const a of findings)rows.push(await investigationResult(env,a.id));
  return {rows,summary:summarizeResearchOutcomes(rows),registered:findings.length,method:'Recent activity window only (up to 150 findings and reviews). Every originally supported stock case in this window is counted, including later rejections. Full permanent history is available in the archive. Observations can overlap and are not independent trades or portfolio returns. Edge not established.'};
+}
+
+const ANALYST_BANKS=['Morgan Stanley','Goldman Sachs','JPMorgan','Bank of America','Citi','UBS','Barclays','Deutsche Bank','Wells Fargo','Jefferies','RBC Capital Markets','Bernstein'];
+export function analystTargetValid(x,now=Date.now()){
+ const source=u=>{try{const p=new URL(u);return p.protocol==='https:'&&!p.username&&!p.password&&!['x.com','twitter.com'].includes(p.hostname)&&u.length<1500}catch{return false}};
+ return x&&ANALYST_BANKS.includes(x.institution)&&/^[A-Z][A-Z0-9.-]{0,11}$/.test(x.ticker||'')&&x.currency==='USD'&&day(x.published)&&Date.parse(x.published)<=now&&now-Date.parse(x.published)<8*86400000&&[x.oldTarget,x.newTarget].every(n=>Number.isFinite(n)&&n>0&&n<100000)&&x.oldTarget!==x.newTarget&&['analyst','rating','horizon','reason'].every(k=>typeof x[k]==='string'&&x[k].length<=500)&&Array.isArray(x.sources)&&x.sources.length>0&&x.sources.length<=6&&x.sources.every(source);
+}
+async function ingestAnalystTargets(b,env){
+ if(!Array.isArray(b.items)||b.items.length>12||b.items.some(x=>!analystTargetValid(x)))return {status:400,body:{error:'Invalid analyst target revision'}};
+ const ledger=await readResearch(env,'poor/analyst-targets/ledger')||{items:[]};let added=0,conflicts=0;
+ for(const x of b.items){
+  const id=await researchId([x.institution,x.analyst.toLowerCase(),x.ticker,x.published,x.newTarget,x.currency].join('|'));
+  const old=ledger.items.find(r=>r.id===id);
+  if(old){if(old.oldTarget!==x.oldTarget)conflicts++;continue;}
+  if(ledger.items.length>=2000)return {status:409,body:{error:'Target ledger full; archive required before accepting more'}};
+  const cached=await readResearch(env,'pif/v1/prices-v4/'+x.ticker),p=cached?.value;
+  const anchor=p?.currency===x.currency&&p.latest>0?{date:p.asOf,price:p.latest}:null;
+  const item=Object.fromEntries(['ticker','institution','analyst','published','currency','oldTarget','newTarget','rating','horizon','reason','sources'].map(k=>[k,x[k]]));
+  ledger.items.push({...item,id,observedAt:new Date().toISOString(),anchor});added++;
+ }
+ ledger.checkedAt=new Date().toISOString();ledger.status=String(b.status||'Checked').slice(0,200);ledger.coveredSymbols=(b.coveredSymbols||[]).filter(s=>/^[A-Z][A-Z0-9.-]{0,11}$/.test(s)).slice(0,30);
+ await env.BUCKET.put('poor/analyst-targets/ledger',JSON.stringify(ledger));return {status:200,body:{ok:true,added,conflicts}};
+}
+export function analystTargetResult(r,p,spy,now=Date.now()){
+ const base={revisionPct:(r.newTarget/r.oldTarget-1)*100};
+ if(!p||p.currency!==r.currency||!p.closes)return {...base,state:'Price history unavailable'};
+ if(r.anchor&&(!(p.closes[r.anchor.date]>0)||Math.abs(p.closes[r.anchor.date]/r.anchor.price-1)>.01))return {...base,state:'Price basis changed; split/correction review needed'};
+ const fresh=p.latest>0&&day(p.asOf)&&Date.parse(p.asOf)<=now&&now-Date.parse(p.asOf)<5*86400000;
+ const observed=r.observedAt.slice(0,10),dates=Object.keys(p.closes).filter(d=>d>observed&&d<=p.asOf&&p.closes[d]>0).sort();
+ const current=fresh?{latest:p.latest,priceDate:p.asOf,impliedUpside:(r.newTarget/p.latest-1)*100}:{};
+ if(!dates.length)return {...base,...current,state:'Awaiting first close after observation'};
+ const entry=dates[0],end=dates[Math.min(20,dates.length-1)],entryPrice=p.closes[entry],returnPct=(p.closes[end]/entryPrice-1)*100,direction=Math.sign(r.newTarget-entryPrice);
+ const complete=dates.length>=21,window=dates.slice(0,21),excess=spy?.currency===p.currency&&spy?.closes?.[entry]>0&&spy?.closes?.[end]>0?returnPct-(spy.closes[end]/spy.closes[entry]-1)*100:null;
+ return {...base,...current,state:complete?'20 sessions complete':'Tracking',entry,end,entryPrice,sessions:Math.min(20,dates.length-1),returnPct,excess,complete,direction,directionalReturn:direction?direction*returnPct:null,targetTouched:direction!==0&&window.some(d=>direction>0?p.closes[d]>=r.newTarget:p.closes[d]<=r.newTarget)};
+}
+export function analystTrackRecords(items){
+ const groups=new Map();
+ for(const row of items){for(const [kind,name] of [['institution',row.institution],...(row.analyst&&row.analyst!=='Unknown'?[['analyst',row.institution+' · '+row.analyst]]:[])]){const key=kind+name;if(!groups.has(key))groups.set(key,{kind,name,observed:0,completed:0,wins:0,totalReturn:0,totalExcess:0,excessCount:0,touched:0});const g=groups.get(key);g.observed++;const r=row.performance;if(r?.complete&&r.direction!==0){g.completed++;g.wins+=r.directionalReturn>0?1:0;g.totalReturn+=r.returnPct;if(r.excess!==null){g.totalExcess+=r.excess;g.excessCount++;}g.touched+=r.targetTouched?1:0;}}}
+ return [...groups.values()].map(g=>({...g,winRate:g.completed?g.wins/g.completed*100:null,meanReturn:g.completed?g.totalReturn/g.completed:null,meanExcess:g.excessCount?g.totalExcess/g.excessCount:null,label:g.completed>=10?'Descriptive sample':'Building track record'}));
+}
+async function analystTargetsArchive(env){
+ const ledger=await readResearch(env,'poor/analyst-targets/ledger')||{items:[]},symbols=[...new Set(ledger.items.map(r=>r.ticker).concat('SPY'))],prices={};
+ await Promise.all(symbols.map(async s=>{prices[s]=(await readResearch(env,'pif/v1/prices-v4/'+s))?.value}));
+ const items=ledger.items.map(r=>({...r,performance:analystTargetResult(r,prices[r.ticker],prices.SPY)})).sort((a,b)=>b.observedAt.localeCompare(a.observedAt));
+ return {...ledger,items,trackRecords:analystTrackRecords(items),method:'Prospective: entry is first daily close strictly after poor first recorded the revision. Fixed 20 subsequent trading sessions; long-stock price return and matched SPY excess exclude dividends and costs. Directional win follows whether the target was above or below entry. Target touch uses closing prices only, within this same window; not an evaluation of the full stated target horizon. Revisions remain separate, potentially correlated observations. Split/correction basis changes suspend comparison.'};
 }
