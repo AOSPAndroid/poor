@@ -28,8 +28,8 @@ class Tests(unittest.TestCase):
   self.assertEqual(set(e.select_source_urls(urls,limit=4)),set(urls))
  def test_budget_persists_before_work(self):
   state={};saved=[]
-  for _ in range(8):self.assertTrue(p.reserve(state,'investigations','2026-09-28',lambda s:saved.append(dict(s))))
-  self.assertFalse(p.reserve(state,'investigations','2026-09-28',lambda s:None));self.assertEqual(len(saved),8)
+  for _ in range(12):self.assertTrue(p.reserve(state,'investigations','2026-09-28',lambda s:saved.append(dict(s))))
+  self.assertFalse(p.reserve(state,'investigations','2026-09-28',lambda s:None));self.assertEqual(len(saved),12)
   self.assertTrue(p.reserve(state,'investigations','2026-09-29',lambda s:None));self.assertEqual(state['investigations'],1)
   for _ in range(8):self.assertTrue(p.reserve(state,'challenges','2026-09-29',lambda s:None))
   self.assertFalse(p.reserve(state,'challenges','2026-09-29',lambda s:None))

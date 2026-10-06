@@ -56,7 +56,7 @@ def order_candidates(candidates):
     ordered=sorted(candidates,key=lambda x:x['priority'],reverse=True)
     # Reserve room for one daily news brief and one contract, without raising the budget.
     chosen=[]
-    for kind in ('stock','contract','briefing'):
+    for kind in ('stock','briefing','contract'):
         item=next((x for x in ordered if x['type']==kind),None)
         if item: chosen.append(item)
     return chosen+[x for x in ordered if x not in chosen]

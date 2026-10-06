@@ -48,7 +48,7 @@ class DecisionTests(unittest.TestCase):
         self.assertIsNone(stock_snapshot({'value':v},{},self.today)['excess20SPYPctPoints'])
     def test_news_has_budget_slot_and_extremes_do_not_dominate(self):
         candidates=[{'type':'stock','priority':10,'target':str(i)} for i in range(4)]+[{'type':'contract','priority':7},{'type':'briefing','priority':1}]
-        self.assertEqual([c['type'] for c in order_candidates(candidates)[:3]],['stock','contract','briefing'])
+        self.assertEqual([c['type'] for c in order_candidates(candidates)[:3]],['stock','briefing','contract'])
         def m(price):return {'rules':'rules','resolutionSource':'source','outcomes':[{'label':'Yes','price':price}],'liquidity':2000}
         self.assertGreater(contract_rank(m(.5)),contract_rank(m(.003)))
     def test_guides_and_source_priority(self):

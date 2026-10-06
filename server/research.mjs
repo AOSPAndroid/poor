@@ -91,7 +91,7 @@ export function validDailyThesis(a){
  if(!['pricedIn','invalidation','horizon'].every(k=>typeof a[k]==='string'&&a[k].trim()&&a[k].length<=800)||!Array.isArray(a.evidence)||a.evidence.length<2||a.evidence.length>4)return false;
  const kinds=new Set(),urls=new Set();let political=false,primary=false;
  for(const e of a.evidence){if(!e||!['political','insider','policy','contract','company','market'].includes(e.kind)||typeof e.fact!=='string'||!e.fact.trim()||e.fact.length>800||!a.sources.includes(e.url)||e.date!==null&&(!day(e.date)||e.date>today()))return false;
-  let host;try{host=new URL(e.url).hostname}catch{return false}if(['disclosures-clerk.house.gov','efdsearch.senate.gov','extapps2.oge.gov','www.sec.gov','www.federalregister.gov','www.usaspending.gov','www.congress.gov'].includes(host))primary=true;
+  let host;try{host=new URL(e.url).hostname}catch{return false}if(['disclosures-clerk.house.gov','efdsearch.senate.gov','extapps2.oge.gov','www.sec.gov','www.federalregister.gov','www.usaspending.gov','www.congress.gov','www.energy.gov','energy.gov','home.treasury.gov','www.commerce.gov'].includes(host))primary=true;
   kinds.add(e.kind);urls.add(e.url);if(['political','policy'].includes(e.kind))political=true;
  }
  return kinds.size>=2&&urls.size>=2&&political&&primary;
@@ -115,7 +115,7 @@ export async function researchIngest(request,env){
  if(b.kind==='analyst-targets')return ingestAnalystTargets(b,env);
  if(b.kind==='news')return ingestNews(b,env);
  if(b.kind==='investigation')return ingestInvestigation(b,env);
- if(b.kind==='pipeline-status'){if(!Number.isInteger(b.investigations)||b.investigations<0||b.investigations>8||!Number.isInteger(b.challenges)||b.challenges<0||b.challenges>8)return {status:400,body:{error:'Invalid budget'}};await env.BUCKET.put('poor/research/pipeline-status',JSON.stringify({checkedAt:new Date().toISOString(),investigations:b.investigations,challenges:b.challenges,status:String(b.status||'').slice(0,250)}));return {status:200,body:{ok:true}};}
+ if(b.kind==='pipeline-status'){if(!Number.isInteger(b.investigations)||b.investigations<0||b.investigations>12||!Number.isInteger(b.challenges)||b.challenges<0||b.challenges>8)return {status:400,body:{error:'Invalid budget'}};await env.BUCKET.put('poor/research/pipeline-status',JSON.stringify({checkedAt:new Date().toISOString(),investigations:b.investigations,challenges:b.challenges,status:String(b.status||'').slice(0,250),health:b.health&&typeof b.health==='object'?{degraded:b.health.degraded===true,attempted:Number(b.health.attempted)||0,verified:Number(b.health.verified)||0,unverified:Number(b.health.unverified)||0,sourceErrors:(Array.isArray(b.health.sourceErrors)?b.health.sourceErrors:[]).slice(0,10).map(x=>String(x).slice(0,150)),trackedStocks:Number(b.health.trackedStocks)||0,newsScanned:Number(b.health.newsScanned)||0}:null}));return {status:200,body:{ok:true}};}
  if(b.kind==='review-status'){await env.BUCKET.put('poor/research/reviewer-status',JSON.stringify({checkedAt:new Date().toISOString(),status:String(b.status||'').slice(0,200)}));return {status:200,body:{ok:true}};}
  if(b.kind==='review')return ingestReview(b,env);
  if(b.kind==='daily'){

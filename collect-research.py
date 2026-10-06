@@ -176,4 +176,5 @@ if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--research',action='store_true');p.add_argument('--local',action='store_true');a=p.parse_args();run(a.research,a.local)
     if a.research and not a.local:
         from investigations import run as investigate
-        investigate(monitor_only=collector_monitor_only())
+        result=investigate(monitor_only=collector_monitor_only())
+        raise SystemExit(2 if result and result['degraded'] else 0)

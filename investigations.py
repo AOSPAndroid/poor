@@ -1,4 +1,4 @@
-"""Change-driven public research. Eight investigations and eight challenges per Paris day."""
+"""Change-driven public research. Twelve investigations and eight challenges per Paris day."""
 import datetime, hashlib, importlib.util, json, os, re, time
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -9,7 +9,7 @@ from decision_checks import guidance, stock_snapshot, contract_rank, order_candi
 spec=importlib.util.spec_from_file_location('collector',Path(__file__).with_name('collect-research.py'))
 c=importlib.util.module_from_spec(spec);spec.loader.exec_module(c)
 STATE=PROFILE/'poor-investigations-v1.json'
-DAILY_LIMITS={'investigations':8,'challenges':8}
+DAILY_LIMITS={'investigations':12,'challenges':8}
 
 def digest(value):return hashlib.sha256(json.dumps(value,sort_keys=True,ensure_ascii=False).encode()).hexdigest()
 def save(state):
@@ -47,15 +47,29 @@ def collect(base,token,state):
                 events=[{k:n.get(k) for k in ('kind','label','detail','date','url','status')} for n in graph.get('nodes',[]) if n.get('url','').startswith('https://') and n.get('status') in ('record','sourced')][:6]
                 packets.append({'ticker':s,'disclosures':[r for r in rows if r.get('ticker')==s][:4],'catalysts':events})
             except Exception:pass
+    from catalyst_monitor import scan, news_candidates
+    official=scan(rows)
+    leads,coverage=news_candidates(rows,lambda s:c.request(base,'/api/news?symbol='+s),today,state.get('newsOffset',0))
+    state['newsOffset']=coverage['nextOffset'];state['coverage']={'official':official,'news':coverage};save(state)
+    retained={x['ticker']+'|'+x['url']:x for x in state.get('catalystEvents',[]) if str(today-datetime.timedelta(days=7))<=x.get('date','')<=str(today)}
+    for event in official.get('items',[])+leads:retained[event['ticker']+'|'+event['url']]=event
+    state['catalystEvents']=sorted(retained.values(),key=lambda x:x['date'],reverse=True)[:3000];save(state)
+    for event in state['catalystEvents']:
+        symbol=event['ticker'];packet=next((p for p in packets if p['ticker']==symbol),None)
+        if packet is None:
+            packet={'ticker':symbol,'disclosures':[r for r in rows if r.get('ticker')==symbol][:6],'catalysts':[]};packets.append(packet)
+        if event['url'] not in {e.get('url') for e in packet['catalysts']}:packet['catalysts'].append(event)
+        packet['freshCatalyst']=True
     candidates=[]
     for p in packets:
         target=p['ticker'];p['sales']=[{k:r.get(k) for k in ('person','traded','filed','source','amount')} for r in rows if r.get('ticker')==target and r.get('type')=='Sale'][:4]
-        candidate=changed_candidate('stock',target,p,state.get('seen',{}).get('stock:'+target));candidate['priority']=5+(3 if target in priorities else 0)+min(3,len(p.get('catalysts',[])));candidates.append(candidate)
+        candidate=changed_candidate('stock',target,p,state.get('seen',{}).get('stock:'+target));candidate['priority']=5+(3 if target in priorities else 0)+min(3,len(p.get('catalysts',[])))+(10 if p.get('freshCatalyst') else 0)+(10 if any(e.get('status')=='sourced' and any(h in e.get('url','') for h in ('energy.gov/','treasury.gov/','commerce.gov/')) for e in p.get('catalysts',[])) else 0);candidates.append(candidate)
     try:
         marketfeed=c.request(base,'/api/predictions')
         if marketfeed.get('stale') or not marketfeed.get('value'):raise ValueError('Stale contracts')
         markets=[]
         for m in marketfeed['value']['markets']:
+            if re.search(r'\b(?:tweets?|posts?)\b',m.get('question',''),re.I) and re.search(r'\b(?:Musk|Elon)\b',m.get('question',''),re.I):continue
             try:days=(datetime.date.fromisoformat(m['end'][:10])-today).days
             except (KeyError,TypeError,ValueError):continue
             if 0<=days<=90 and (m.get('volume') or 0)>=1000 and (m.get('liquidity') or 0)>=1000:markets.append(m)
@@ -148,6 +162,21 @@ def flush(state,base,token):
     for item in list(state.get('outbox',[])):
         c.request(base,'/api/research/ingest',{'kind':'investigation','item':item},token);state['outbox'].remove(item);save(state)
 
+
+def retry_eligible(candidate,old,cases,today):
+    if old.get('fingerprint')!=candidate['fingerprint'] or old.get('ok'):return True
+    failed=[v for v in cases.values() if v['candidate']['type']==candidate['type'] and v['candidate']['target']==candidate['target'] and v['candidate']['fingerprint']==candidate['fingerprint'] and v['finding']['verdict']=='unverified']
+    return len(failed)<2 or (datetime.date.fromisoformat(today)-datetime.date.fromisoformat(old.get('date',today))).days>=7
+
+def pipeline_health(state,today):
+    cases=[v for v in state['cases'].values() if datetime.datetime.fromtimestamp(v['createdAt'],ZoneInfo('Europe/Paris')).date().isoformat()==today]
+    verified=sum((v['finding'].get('decisiveEvidenceRetrieved',False) and v['finding']['verdict']!='unverified') or v.get('rescueVerified',False) for v in cases)
+    failed=sum(v['finding']['verdict']=='unverified' for v in cases)
+    errors=state.get('coverage',{}).get('official',{}).get('errors',[])
+    degraded=bool(errors or len(cases)>=2 and verified==0)
+    status=('Needs attention' if degraded else 'Evidence verified' if verified else 'Monitoring; no verified findings yet')+f' · {verified}/{len(cases)} source-checked · {failed} unverified · {state.get("challenges",0)} reviews'
+    return {'degraded':degraded,'status':status,'attempted':len(cases),'verified':verified,'unverified':failed,'sourceErrors':errors,'newsScanned':len(state.get('coverage',{}).get('news',{}).get('scanned',[])),'trackedStocks':state.get('coverage',{}).get('news',{}).get('total',0)}
+
 def run(monitor_only=False,max_new=3):
     # OS-held lock is released automatically after crashes; no stale lock stealing.
     lock=open(PROFILE/'poor-investigations.lock','a+b');lock.seek(0);lock.write(b'0');lock.flush();lock.seek(0)
@@ -178,24 +207,27 @@ def run(monitor_only=False,max_new=3):
                 if not changed_price and ((old.get('ok') and not due) or old.get('date')==today):continue
                 candidate['id']=digest(candidate['id']+'|followup|'+today+'|'+str(old.get('caseId',''))+('|' + after if changed_price else ''))[:24]
                 if changed_price:candidate['context']['followup']='Prior plan changed from '+before+' to '+after+'. Reassess the original thesis; preserve any invalidation.'
+            if not retry_eligible(candidate,old,state['cases'],today):continue
             eligible.append(candidate)
         eligible=order_candidates(eligible)
         print('Monitor: '+str(len(candidates))+' candidates; '+str(len(eligible))+' changed or due')
         if not monitor_only:
             for candidate in eligible[:max_new]:
+                if candidate['type']=='contract' and sum(v['candidate']['type']=='contract' and datetime.datetime.fromtimestamp(v['createdAt'],ZoneInfo('Europe/Paris')).date().isoformat()==today for v in state['cases'].values())>=2:continue
                 if not reserve(state,'investigations',today):break
                 candidate=market_context(candidate,base)
                 key=candidate['type']+':'+candidate['target'];state['seen'][key]={'fingerprint':candidate['fingerprint'],'anchor':candidate['anchor'],'date':today,'caseId':candidate['id'],'ok':False};save(state)
                 ok=False;report={};allowed=set();evidence_ready=False
                 try:
-                    report,allowed=run_report(prompt_for(candidate),allowed_sources(candidate),seconds=120,max_pages=8,writing_seconds=90,verified_only=True,search_limit=8)
+                    report,allowed=run_report(prompt_for(candidate),allowed_sources(candidate),seconds=150,max_pages=8,writing_seconds=120,verified_only=True,search_limit=8)
                     candidate=market_context(candidate,base)
                     finding=screen_case(report,validate_case(report,allowed),candidate,allowed);ok=finding['verdict']!='unverified'
                     evidence_ready=decisive_evidence_retrieved(report,finding,allowed)
                     if evidence_ready and finding['verdict'] in ('supported','wait'):
                         try:publish_news(report,candidate,finding,base,token)
                         except Exception:print('Decision brief retained; news format or date did not qualify')
-                except Exception:
+                except Exception as exc:
+                    report['_diagnostics']={'failureType':type(exc).__name__}
                     finding={'verdict':'unverified','title':'Could not verify '+candidate['target'],'whyNow':'A new source record, changed contract or scheduled news scan prompted a check.','entry':'No entry justified by this research attempt.','risk':'Current evidence could not be verified.','nextCheck':'Retry on the next eligible daily run or after a material change.','reason':'The research attempt did not return a complete source-checked brief. This is not a rejection of the investment.','sources':[]}
                 item={k:candidate[k] for k in ('id','type','target','fingerprint')};item.update(finding,phase='finding',decisiveEvidenceRetrieved=evidence_ready)
                 if candidate['type']=='contract':item['rules']=candidate['context']['rules']
@@ -209,12 +241,13 @@ def run(monitor_only=False,max_new=3):
                     except Exception:print('Decision brief saved; full thesis did not meet publication requirements')
             cases=sorted(state['cases'].values(),key=lambda v:(v['finding']['verdict']=='supported',v['candidate'].get('priority',0),v['createdAt']),reverse=True)
             for case in cases:
-                if case.get('challengeDate')==today or case.get('challengeOK') or case['finding']['verdict'] not in ('supported','wait') or time.time()-case['createdAt']>7*86400:continue
+                if case.get('challengeDate')==today or case.get('challengeOK') or case['finding']['verdict'] not in ('supported','wait') and not (case['candidate']['type']=='stock' and case['candidate']['context'].get('freshCatalyst') and not case.get('challengeDate')) or time.time()-case['createdAt']>7*86400:continue
                 candidate=case['candidate']
                 current=next((x for x in candidates if x['type']==candidate['type'] and x['target']==candidate['target']),None)
                 if not current or current['fingerprint']!=candidate['fingerprint']:continue
                 if not reserve(state,'challenges',today):break
                 case['challengeDate']=today;save(state)
+                report={};allowed=set()
                 try:
                     candidate=market_context(candidate,base)
                     report,allowed=run_report(prompt_for(candidate,case['finding']),allowed_sources(candidate)|set(case['finding']['sources']),seconds=120,max_pages=8,profile=PROFILE.parent/'athena',verified_only=True,writing_seconds=90,search_limit=8)
@@ -223,14 +256,24 @@ def run(monitor_only=False,max_new=3):
                 except Exception:
                     review={**{k:case['finding'][k] for k in ('title','whyNow','entry','risk','nextCheck')},'verdict':'unverified','reason':'Independent review could not verify the case. The original assessment remains unconfirmed.','sources':[]}
                 case['challengeOK']=review['verdict']!='unverified'
-                item={k:case['finding'][k] for k in ('id','type','target','fingerprint','rules') if k in case['finding']};item.update(review,phase='challenge',attempt=digest(candidate['id']+'|'+today)[:24]);state['outbox'].append(item);save(state);flush(state,base,token)
+                case['review']=review
+                item={k:case['finding'][k] for k in ('id','type','target','fingerprint','rules') if k in case['finding']};item.update(review,decisiveEvidenceRetrieved=decisive_evidence_retrieved(report,review,allowed,challenge=True),phase='challenge',attempt=digest(candidate['id']+'|'+today)[:24]);state['outbox'].append(item);save(state);flush(state,base,token)
+                if case['finding']['verdict']=='unverified' and item['decisiveEvidenceRetrieved'] and review['verdict'] in ('supported','wait'):
+                    case['rescueVerified']=True
+                    rescued={**item,'id':digest(candidate['id']+'|verified-rescue')[:24],'phase':'finding'}
+                    state['outbox'].append(rescued);save(state);flush(state,base,token)
+                    rescue_report={**report,'case':report.get('review',{})}
+                    try:publish_news(rescue_report,candidate,rescued,base,token)
+                    except Exception:print('Verified rescue retained in research feed')
                 if case.get('articleId') and review['sources']:
                     try:c.request(base,'/api/research/ingest',{'kind':'review','articleId':case['articleId'],'verdict':{'supported':'supported','wait':'inconclusive','rejected':'challenged','unverified':'inconclusive'}[review['verdict']],'summary':review['reason'],'sources':review['sources']},token)
                     except Exception:print('Activity review saved; article review will need a later check')
         status='Monitoring only; no model calls' if monitor_only else ('No material changes; existing cases retained' if not eligible else 'Changed cases checked within the daily budget; unverified cases remain visible')
-        c.request(base,'/api/research/ingest',{'kind':'pipeline-status','investigations':state.get('investigations',0),'challenges':state.get('challenges',0),'status':status},token);save(state)
+        health=pipeline_health(state,today);status=health['status'];state['health']=health
+        c.request(base,'/api/research/ingest',{'kind':'pipeline-status','investigations':state.get('investigations',0),'challenges':state.get('challenges',0),'status':status,'health':health},token);save(state)
         print(status+'; investigations '+str(state.get('investigations',0))+'/'+str(DAILY_LIMITS['investigations'])+'; challenges '+str(state.get('challenges',0))+'/'+str(DAILY_LIMITS['challenges']))
+        return health
     finally:lock.close()
 if __name__=='__main__':
     import argparse
-    p=argparse.ArgumentParser();p.add_argument('--monitor-only',action='store_true');p.add_argument('--max-new',type=int,choices=range(0,4),default=3);a=p.parse_args();run(a.monitor_only,a.max_new)
+    p=argparse.ArgumentParser();p.add_argument('--monitor-only',action='store_true');p.add_argument('--max-new',type=int,choices=range(0,4),default=3);a=p.parse_args();result=run(a.monitor_only,a.max_new);raise SystemExit(2 if result and result['degraded'] else 0)

@@ -37,7 +37,7 @@ def valid_thesis(a,today):
                 if datetime.date.fromisoformat(e['date'])>today:return False
             except (ValueError,TypeError):return False
         kinds.add(e['kind']);urls.add(e['url'])
-        if urlparse(e['url']).hostname in ['disclosures-clerk.house.gov','efdsearch.senate.gov','extapps2.oge.gov','www.sec.gov','www.federalregister.gov','www.usaspending.gov','www.congress.gov']:primary=True
+        if urlparse(e['url']).hostname in ['disclosures-clerk.house.gov','efdsearch.senate.gov','extapps2.oge.gov','www.sec.gov','www.federalregister.gov','www.usaspending.gov','www.congress.gov','www.energy.gov','energy.gov','home.treasury.gov','www.commerce.gov']:primary=True
     return len(kinds)>=2 and len(urls)>=2 and bool(kinds & {'political','policy'}) and primary
 
 def run(refresh=False):
@@ -92,4 +92,5 @@ def run(refresh=False):
     print(status)
 if __name__=='__main__':
     from investigations import run as investigate
-    investigate()
+    result=investigate()
+    raise SystemExit(2 if result and result['degraded'] else 0)
