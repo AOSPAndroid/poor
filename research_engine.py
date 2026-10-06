@@ -10,6 +10,10 @@ class ResearchBusy(RuntimeError):pass
 class ResearchTimeout(RuntimeError):pass
 class ResearchEmpty(RuntimeError):pass
 
+def record_model_failure(profile,model):
+    path=Path(profile)/'poor-model-health.json'
+    path.write_text(json.dumps({'model':model,'failedAt':time.time(),'retryAfter':time.time()+1800}),encoding='utf-8')
+
 def parse_json(text):
     decoder=json.JSONDecoder()
     for match in re.finditer(r'\{',text):
@@ -19,10 +23,15 @@ def parse_json(text):
         except ValueError:pass
     raise ValueError('No completed report')
 
-def invoke(prompt, seconds, discovery=True,profile=None):
+def invoke(prompt, seconds, discovery=True,profile=None,_fallback=False):
     profile=Path(profile) if profile else PROFILE
     import yaml
     model=yaml.safe_load((profile/'config.yaml').read_text(encoding='utf-8')).get('model',{}).get('default','grok-4.7')
+    try:
+        health=json.loads((profile/'poor-model-health.json').read_text(encoding='utf-8'))
+        if model=='grok-4.7' and health.get('model')==model and health.get('retryAfter',0)>time.time():_fallback=True
+    except (OSError,ValueError):pass
+    if _fallback:model='grok-4.6'
     args=[str(PROFILE.parents[1]/'bin/hermes.exe'),'--profile',profile.name,'chat','--ignore-user-config','--ignore-rules','--provider','xai-oauth','--model',model,'--reasoning','low','--oneshot','-Q','--query-file','-','--max-turns','10' if discovery else '2','--run-budget',str(seconds),'--toolsets','search,x_search' if discovery else 'context_engine']
     if not discovery:args+=['--safe-mode']
     started=time.time()
@@ -35,9 +44,13 @@ def invoke(prompt, seconds, discovery=True,profile=None):
         else:proc.kill()
         out,err=proc.communicate(timeout=10)
     print('Research pass: '+('discovery' if discovery else 'writing')+'; '+str(round(time.time()-started))+'s; exit '+str(proc.returncode)+'; output '+str(len(out or ''))+' characters')
-    if 'at capacity' in (out+' '+err).lower():raise ResearchBusy('Research service busy')
-    if timed_out and not out:raise ResearchTimeout('Research provider timed out without a result')
-    if not out.strip():raise ResearchEmpty('Research provider returned no report')
+    failure=ResearchBusy('Research service busy') if 'at capacity' in (out+' '+err).lower() else ResearchTimeout('Research provider timed out without a result') if timed_out and not out else ResearchEmpty('Research provider returned no report') if not out.strip() else None
+    if failure:
+        if model=='grok-4.7' and not _fallback:
+            record_model_failure(profile,model)
+            print('Primary model unavailable; retrying once with grok-4.6')
+            return invoke(prompt,seconds,discovery,profile,True)
+        raise failure
     return out or ''
 
 def discovered_evidence(run_id,profile=None):
