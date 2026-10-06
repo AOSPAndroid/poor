@@ -3,6 +3,7 @@ spec=importlib.util.spec_from_file_location('daily','daily-research.py');d=impor
 class DailyTests(unittest.TestCase):
  def test_provenance(self):
   today=datetime.date.today();u='https://www.sec.gov/news/test';a=dict(title='News',tldr='Summary',why='Implication',risk='Uncertainty',watch='Next filing',published=str(today),tickers=['INTC'],sources=[u,'https://www.congress.gov/test'],pricedIn='Unknown',invalidation='Bill fails',horizon='2-20 days',evidence=[{'kind':'insider','fact':'Filing','date':str(today),'url':u},{'kind':'policy','fact':'Bill','date':str(today),'url':'https://www.congress.gov/test'}])
+  a['tradePlan']={'direction':'watch','symbol':'INTC','entryTrigger':'Wait for a confirmed filing','exitRule':'Reassess if the bill fails','catalyst':'A dated committee decision'}
   self.assertEqual(len(d.validate_articles({'articles':[a]},{u,'https://www.congress.gov/test'},set(),today)),1)
   self.assertEqual(d.validate_articles({'articles':[a]},set(),set(),today),[])
   self.assertEqual(d.validate_articles({'articles':[a]},{u,'https://www.congress.gov/test'},{'|'.join(sorted(a['sources']))},today),[])
