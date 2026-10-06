@@ -51,7 +51,8 @@ def collect(base,token,state):
     official=scan(rows)
     leads,coverage=news_candidates(rows,lambda s:c.request(base,'/api/news?symbol='+s),today,state.get('newsOffset',0))
     state['newsOffset']=coverage['nextOffset'];state['coverage']={'official':official,'news':coverage};save(state)
-    retained={x['ticker']+'|'+x['url']:x for x in state.get('catalystEvents',[]) if str(today-datetime.timedelta(days=7))<=x.get('date','')<=str(today)}
+    official_keys={x['ticker']+'|'+x['url'] for x in official.get('items',[])}
+    retained={x['ticker']+'|'+x['url']:x for x in state.get('catalystEvents',[]) if str(today-datetime.timedelta(days=7))<=x.get('date','')<=str(today) and (x.get('status')!='sourced' or x['ticker']+'|'+x['url'] in official_keys)}
     for event in official.get('items',[])+leads:retained[event['ticker']+'|'+event['url']]=event
     state['catalystEvents']=sorted(retained.values(),key=lambda x:x['date'],reverse=True)[:3000];save(state)
     for event in state['catalystEvents']:

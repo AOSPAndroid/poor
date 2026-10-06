@@ -28,7 +28,8 @@ def issuer_names(rows):
  for r in rows:
   s=r.get('ticker','')
   if r.get('quality')=='User-provided' or r.get('asset') not in ('Stock','ADR','Call options','ETF') or not re.fullmatch(r'[A-Z][A-Z0-9.-]{0,11}',s):continue
-  name=ALIASES.get(s) or re.split(r'\b(?:Common|Class|Stock|Shares|COM|CL|Corp|Corporation|Inc|PLC|Ltd)\b|\(',r.get('company',''),maxsplit=1,flags=re.I)[0].strip(' .-')
+  name=ALIASES.get(s) or re.split(r'\b(?:Common|Class|Stock|Shares|COM|CL)\b|\(',r.get('company',''),maxsplit=1,flags=re.I)[0].strip(' .-')
+  if name.lower() in ('service','strategy','target','news','energy','capital','bank','trust','international','united','first'):continue
   if len(name)>=4 and not re.search(r'\d|\$',name):names[s]=name
  return names
 
@@ -43,7 +44,7 @@ def match_document(doc,names,today):
 def scan(rows,force=False):
  old=json.loads(STATE.read_text(encoding='utf-8')) if STATE.exists() else {}
  names=issuer_names(rows);today=dt.date.today()
- if not force and time.time()-old.get('checkedAt',0)<1800 and old.get('symbols')==sorted(names):return old
+ if not force and time.time()-old.get('checkedAt',0)<1800 and old.get('names')==names:return old
  checked_url(SOURCES['DOE'])
  from tools.url_safety import create_ssrf_safe_client
  urls=[];errors=[]
@@ -60,7 +61,7 @@ def scan(rows,force=False):
   except Exception:return {'url':url}
  with ThreadPoolExecutor(max_workers=4) as pool:docs=list(pool.map(read,dict.fromkeys(urls)))
  items=[item for doc in docs for item in match_document(doc,names,today)]
- result={'checkedAt':time.time(),'symbols':sorted(names),'items':items,'sources':list(SOURCES),'errors':errors,'pages':len(docs),'retrieved':sum(bool(d.get('text')) for d in docs)}
+ result={'checkedAt':time.time(),'names':names,'symbols':sorted(names),'items':items,'sources':list(SOURCES),'errors':errors,'pages':len(docs),'retrieved':sum(bool(d.get('text')) for d in docs)}
  if docs and not result['retrieved']:result['errors'].append('No announcement text retrieved')
  temp=STATE.with_suffix('.tmp');temp.write_text(json.dumps(result),encoding='utf-8');temp.replace(STATE);return result
 
