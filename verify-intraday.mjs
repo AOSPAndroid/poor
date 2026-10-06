@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+const ctx=vm.createContext({Intl,Date,Map,Number});vm.runInContext(fs.readFileSync('dist/intraday.js','utf8'),ctx);
+const end=Date.parse('2026-10-05T20:00:00Z'),now=end+86400000;
+const intraday=Array.from({length:391},(_,i)=>[end-(390-i)*60000,100+i/100]);
+intraday.push([end,105],[end-86400000,50],[now+60000,900],[end-500,NaN]);
+const all=ctx.intradayPoints({intraday},'1D',now),short=ctx.intradayPoints({intraday},'30m',now);
+assert.equal(all.length,391);assert.equal(short.length,31);assert.equal(short.at(-1)[1],105);
+assert.equal(Date.parse(short.at(-1)[0])-Date.parse(short[0][0]),30*60000);
+assert.equal(ctx.intradayClock(short.at(-1)[0]),'16:00');
+assert.equal(ctx.intradayPoints({},'1D',now).length,0);
+assert.equal(ctx.isIntradayRange('1M'),false);
+console.log('Intraday windows, missing samples, duplicate timestamps, future exclusion and New York time passed.');
