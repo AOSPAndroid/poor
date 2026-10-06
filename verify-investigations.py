@@ -4,6 +4,12 @@ from unittest.mock import patch
 import investigations as p
 import research_engine as e
 class Tests(unittest.TestCase):
+ def test_eight_retrieved_citations_are_valid_but_unknown_is_rejected(self):
+  sources=['https://www.energy.gov/articles/'+str(i) for i in range(8)]
+  case={k:'Source checked' for k in ('title','whyNow','entry','risk','nextCheck','reason')}
+  case.update(verdict='wait',sources=sources)
+  self.assertEqual(len(p.validate_case({'review':case},set(sources),'challenge')['sources']),8)
+  with self.assertRaises(ValueError):p.validate_case({'review':case},set(sources[:-1]),'challenge')
  def test_expanded_discovery_allowance_reaches_agent(self):
   with patch.object(e,'invoke',return_value='{"case":{}}') as invoke,patch.object(e,'discovered_evidence',return_value=[]):
    e.run_report('test',seconds=120,writing_seconds=90,search_limit=8)

@@ -103,7 +103,7 @@ def validate_case(report,allowed,phase='finding',original=None):
     if not all(isinstance(x.get(k),str) and 0<len(x[k].strip())<=400 for k in fields):raise ValueError('Invalid brief')
     if sum(len(x[k].split()) for k in fields)>160:raise ValueError('Brief too long')
     sources=x.get('sources')
-    if not isinstance(sources,list) or len(sources)>5 or not all(isinstance(u,str) and u in allowed for u in sources):raise ValueError('Unretrieved citation')
+    if not isinstance(sources,list) or len(sources)>8 or not all(isinstance(u,str) and u in allowed for u in sources):raise ValueError('Unretrieved citation')
     non_social=[u for u in sources if not re.search(r'(^|\.)(x\.com|twitter\.com|polymarket\.com)$',urlparse(u).hostname or '')]
     if x['verdict']!='unverified' and not non_social:raise ValueError('Independent evidence missing')
     if phase=='challenge' and x['verdict']=='supported' and not any(u not in (original or {}).get('sources',[]) for u in non_social):
@@ -254,7 +254,8 @@ def run(monitor_only=False,max_new=3):
                     report,allowed=run_report(prompt_for(candidate,case['finding']),allowed_sources(candidate)|set(case['finding']['sources']),seconds=120,max_pages=8,profile=PROFILE.parent/'athena',verified_only=True,writing_seconds=90,search_limit=8)
                     candidate=market_context(candidate,base)
                     review=screen_case(report,validate_case(report,allowed,'challenge',case['finding']),candidate,allowed,challenge=True)
-                except Exception:
+                except Exception as exc:
+                    case['reviewFailure']={'type':type(exc).__name__,'reason':str(exc)[:180]}
                     review={**{k:case['finding'][k] for k in ('title','whyNow','entry','risk','nextCheck')},'verdict':'unverified','reason':'Independent review could not verify the case. The original assessment remains unconfirmed.','sources':[]}
                 case['challengeOK']=review['verdict']!='unverified'
                 case['review']=review
